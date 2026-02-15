@@ -8,31 +8,29 @@ type RootStackParamList = {
   InviteScreen: undefined;
 };
 
-type Props = NativeStackScreenProps<RootStackParamList, "CreateEvent">;
+type Props = NativeStackScreenProps<RootStackParamList, "InviteScreen">;
 
-export default function CreateEventScreen({ navigation }: Props) {
-  const [eventName, setEventName] = useState("");
+export default function InviteScreen({ navigation }: Props) {
+  const [email, setEmail] = useState("");
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Create event</Text>
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Invite friends</Text>
 
-      <Text style={styles.label}>Event name</Text>
-      <TextInput
-        value={eventName}
-        onChangeText={setEventName}
-        placeholder="e.g. Pre-drinks at Ben’s"
-        style={styles.input}
-      />
+        <Text style={styles.label}>Email address</Text>
+        <TextInput
+          value={email}
+          onChangeText={setEmail}
+          placeholder="e.g. ben@example.com"
+          style={styles.input}
+        />
 
-      <View style={styles.spacer} />
+        <View style={styles.spacer} />
 
-      <Button
-        title="Choose location"
-        onPress={() => navigation.navigate("ChooseLocation")}
-      />
-    </View>
-  );
+        <Button title="Send invite"  
+        onPress={() => navigation.navigate("CreateEvent")} />
+      </View>
+    );
 }
 
 const styles = StyleSheet.create({

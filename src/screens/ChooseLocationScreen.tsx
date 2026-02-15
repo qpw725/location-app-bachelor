@@ -4,6 +4,7 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 type RootStackParamList = {
   CreateEvent: undefined;
   ChooseLocation: undefined;
+  InviteScreen: undefined;
 };
 
 type Props = NativeStackScreenProps<RootStackParamList, "ChooseLocation">;
@@ -11,12 +12,15 @@ type Props = NativeStackScreenProps<RootStackParamList, "ChooseLocation">;
 export default function ChooseLocationScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Choose location</Text>
-      <Text style={styles.subtitle}>UI placeholder for now</Text>
+        <Text style={styles.title}>Choose location</Text>
+        <Text style={styles.subtitle}>UI placeholder for now</Text>
 
-      <View style={{ height: 16 }} />
+        <View style={{ height: 16 }} />
 
-      <Button title="Back" onPress={() => navigation.goBack()} />
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          <Button title="Back" onPress={() => navigation.goBack()} />
+          <Button title="Next" onPress={() => navigation.navigate("InviteScreen")} />
+        </View>
     </View>
   );
 }
