@@ -1,66 +1,31 @@
-import { StatusBar } from "expo-status-bar";
-import { StyleSheet, Text, View, Button } from "react-native";
-import * as Location from "expo-location";
-import { useState } from "react";
+import { NavigationContainer } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+
+import CreateEventScreen from "./src/screens/CreateEventScreen";
+import ChooseLocationScreen from "./src/screens/ChooseLocationScreen";
+
+type RootStackParamList = {
+  CreateEvent: undefined;
+  ChooseLocation: undefined;
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
-  const [location, setLocation] = useState<Location.LocationObject | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  const getLocation = async () => {
-    // Request permission
-    const { status } = await Location.requestForegroundPermissionsAsync();
-
-    if (status !== "granted") {
-      setErrorMsg("Permission to access location was denied");
-      return;
-    }
-
-    // Get current location
-    const currentLocation = await Location.getCurrentPositionAsync({});
-    setLocation(currentLocation);
-    setErrorMsg(null);
-  };
-
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Localisation App Benja Noé</Text>
-
-      <Button title="Get / Refresh location" onPress={getLocation} />
-
-      {errorMsg && <Text style={styles.error}>{errorMsg}</Text>}
-
-      {location && (
-        <Text style={styles.coords}>
-          Latitude: {location.coords.latitude}{"\n"}
-          Longitude: {location.coords.longitude}
-        </Text>
-      )}
-
-      <StatusBar style="auto" />
-    </View>
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="CreateEvent">
+        <Stack.Screen
+          name="CreateEvent"
+          component={CreateEventScreen}
+          options={{ title: "Create event" }}
+        />
+        <Stack.Screen
+          name="ChooseLocation"
+          component={ChooseLocationScreen}
+          options={{ title: "Location" }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 20,
-  },
-  title: {
-    fontSize: 20,
-    marginBottom: 20,
-    fontWeight: "600",
-  },
-  coords: {
-    marginTop: 15,
-    textAlign: "center",
-  },
-  error: {
-    marginTop: 15,
-    color: "red",
-  },
-});
