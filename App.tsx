@@ -5,10 +5,10 @@ import CreateEventScreen from "./src/screens/CreateEventScreen";
 import ChooseLocationScreen from "./src/screens/ChooseLocationScreen";
 import InviteScreen from "./src/screens/InviteScreen";
 
-type RootStackParamList = {
+export type RootStackParamList = {
   CreateEvent: undefined;
-  ChooseLocation: undefined;
-  InviteScreen: undefined;
+  ChooseLocation: { eventName: string };
+  InviteScreen: { eventName: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -30,7 +30,7 @@ export default function App() {
         <Stack.Screen
           name="InviteScreen"
           component={InviteScreen}
-          options={{ title: "Invite friends" }}
+          options={{ title: "Invite" }}
         />
       </Stack.Navigator>
     </NavigationContainer>

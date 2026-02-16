@@ -1,17 +1,14 @@
 import { View, Text, TextInput, Button, StyleSheet } from "react-native";
 import { useState } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-
-type RootStackParamList = {
-  CreateEvent: undefined;
-  ChooseLocation: undefined;
-  InviteScreen: undefined;
-};
+import type { RootStackParamList } from "../../App";
 
 type Props = NativeStackScreenProps<RootStackParamList, "CreateEvent">;
 
 export default function CreateEventScreen({ navigation }: Props) {
   const [eventName, setEventName] = useState("");
+
+  const canContinue = eventName.trim().length > 0;
 
   return (
     <View style={styles.container}>
@@ -29,7 +26,9 @@ export default function CreateEventScreen({ navigation }: Props) {
 
       <Button
         title="Choose location"
-        onPress={() => navigation.navigate("ChooseLocation")}
+        onPress={() =>
+        navigation.navigate("ChooseLocation", { eventName: eventName.trim() })}
+        disabled={!canContinue}
       />
     </View>
   );
