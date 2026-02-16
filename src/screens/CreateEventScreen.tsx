@@ -2,6 +2,8 @@ import { View, Text, TextInput, Button, StyleSheet } from "react-native";
 import { useState } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../App";
+import StepIndicator from "../components/StepIndicator";
+
 
 type Props = NativeStackScreenProps<RootStackParamList, "CreateEvent">;
 
@@ -12,6 +14,7 @@ export default function CreateEventScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
+      <StepIndicator step={1} total={3} label="Create event" />
       <Text style={styles.title}>Create event</Text>
 
       <Text style={styles.label}>Event name</Text>

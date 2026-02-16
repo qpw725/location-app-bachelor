@@ -2,6 +2,8 @@ import { View, Text, TextInput, Button, StyleSheet } from "react-native";
 import { useState } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../App";
+import StepIndicator from "../components/StepIndicator";
+
 
 type Props = NativeStackScreenProps<RootStackParamList, "InviteScreen">;
 
@@ -11,6 +13,7 @@ export default function InviteScreen({ navigation, route }: Props) {
 
   return (
     <View style={styles.container}>
+      <StepIndicator step={3} total={3} label="Invite people" />
       <Text style={styles.title}>Invite friends</Text>
       <Text style={styles.subtitle}>Event: {eventName}</Text>
 

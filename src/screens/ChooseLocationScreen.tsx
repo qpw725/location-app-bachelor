@@ -1,6 +1,8 @@
 import { View, Text, Button, StyleSheet } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../App";
+import StepIndicator from "../components/StepIndicator";
+
 
 type Props = NativeStackScreenProps<RootStackParamList, "ChooseLocation">;
 
@@ -9,6 +11,7 @@ export default function ChooseLocationScreen({ navigation, route }: Props) {
 
   return (
     <View style={styles.container}>
+      <StepIndicator step={2} total={3} label="Location" />
       <Text style={styles.title}>Choose location</Text>
       <Text style={styles.subtitle}>Event: {eventName}</Text>
 
