@@ -31,7 +31,7 @@ export default function InviteScreen({ navigation, route }: Props) {
 
       <Button
         title="Send invite (placeholder)"
-        onPress={() => navigation.navigate("CreateEvent")}
+        onPress={() => navigation.navigate("EventOverview", { eventName })}
       />
     </View>
   );
