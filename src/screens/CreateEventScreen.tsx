@@ -18,7 +18,7 @@ export default function CreateEventScreen({ navigation }: Props) {
       <TextInput
         value={eventName}
         onChangeText={setEventName}
-        placeholder="e.g. Pre-drinks at Ben’s"
+        placeholder="e.g. Pre-drinks at Bens"
         style={styles.input}
       />
 
