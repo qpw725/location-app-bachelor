@@ -37,7 +37,7 @@ export default function EventOverviewScreen({ route }: Props) {
         <View style={{ height: 10 }} />
 
         <Pressable style={styles.secondaryBtn}>
-          <Text style={styles.secondaryBtnText}>I’ve arrived (placeholder)</Text>
+          <Text style={styles.secondaryBtnText}>I've arrived (placeholder)</Text>
         </Pressable>
       </View>
 

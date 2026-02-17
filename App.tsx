@@ -9,14 +9,21 @@ import InviteScreen from "./src/screens/InviteScreen";
 import EventOverviewScreen from "./src/screens/EventOverviewScreen";
 
 
+export type EventLocation = {
+  label: string;
+  latitude: number;
+  longitude: number;
+};
+
 export type RootStackParamList = {
   Start: undefined;
   MyInvites: undefined;
   CreateEvent: undefined;
   ChooseLocation: { eventName: string };
-  InviteScreen: { eventName: string };
-  EventOverview: { eventName: string };
+  InviteScreen: { eventName: string; location: EventLocation };
+  EventOverview: { eventName: string; location: EventLocation };
 };
+
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
