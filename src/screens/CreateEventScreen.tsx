@@ -1,4 +1,5 @@
-import { View, Text, TextInput, Button, StyleSheet } from "react-native";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
+import { View, Text, TextInput, Button, StyleSheet, Pressable, Platform } from "react-native";
 import { useState } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../App";
@@ -9,8 +10,30 @@ type Props = NativeStackScreenProps<RootStackParamList, "CreateEvent">;
 
 export default function CreateEventScreen({ navigation }: Props) {
   const [eventName, setEventName] = useState("");
+  const [eventTime, setEventTime] = useState(() => {
+    const now = new Date();
+    now.setSeconds(0, 0);
+    return now;
+  });
+  const [showAndroidTimePicker, setShowAndroidTimePicker] = useState(false);
 
   const canContinue = eventName.trim().length > 0;
+  const formattedTime = eventTime.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  function onTimeChange(event: DateTimePickerEvent, selectedDate?: Date) {
+    if (Platform.OS === "android") {
+      setShowAndroidTimePicker(false);
+    }
+
+    if (event.type === "dismissed" || !selectedDate) {
+      return;
+    }
+
+    setEventTime(selectedDate);
+  }
 
   return (
     <View style={styles.container}>
@@ -25,12 +48,48 @@ export default function CreateEventScreen({ navigation }: Props) {
         style={styles.input}
       />
 
+      <View style={styles.timeSection}>
+        <Text style={styles.label}>Event time</Text>
+
+        {Platform.OS === "ios" ? (
+          <View style={styles.iosPickerWrap}>
+            <DateTimePicker
+              value={eventTime}
+              mode="time"
+              display="spinner"
+              onChange={onTimeChange}
+            />
+          </View>
+        ) : (
+          <>
+            <Pressable onPress={() => setShowAndroidTimePicker(true)} style={styles.timeButton}>
+              <Text style={styles.timeButtonText}>{formattedTime}</Text>
+            </Pressable>
+            {showAndroidTimePicker && (
+              <DateTimePicker
+                value={eventTime}
+                mode="time"
+                display="default"
+                onChange={onTimeChange}
+              />
+            )}
+          </>
+        )}
+      </View>
+
       <View style={styles.spacer} />
 
       <Button
         title="Choose location"
         onPress={() =>
-        navigation.navigate("ChooseLocation", { eventName: eventName.trim() })}
+          navigation.navigate("ChooseLocation", {
+            eventName: eventName.trim(),
+            eventTime: {
+              hour: eventTime.getHours(),
+              minute: eventTime.getMinutes(),
+            },
+          })
+        }
         disabled={!canContinue}
       />
     </View>
@@ -49,5 +108,21 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 16,
   },
+  timeSection: { marginTop: 14 },
+  iosPickerWrap: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 10,
+    paddingTop: 4,
+    alignItems: "stretch",
+  },
+  timeButton: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  timeButtonText: { fontSize: 16 },
   spacer: { height: 16 },
 });

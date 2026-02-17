@@ -15,13 +15,18 @@ export type EventLocation = {
   longitude: number;
 };
 
+export type EventTime = {
+  hour: number;
+  minute: number;
+};
+
 export type RootStackParamList = {
   Start: undefined;
   MyInvites: undefined;
   CreateEvent: undefined;
-  ChooseLocation: { eventName: string };
-  InviteScreen: { eventName: string; location: EventLocation };
-  EventOverview: { eventName: string; location: EventLocation };
+  ChooseLocation: { eventName: string; eventTime: EventTime };
+  InviteScreen: { eventName: string; location: EventLocation; eventTime: EventTime };
+  EventOverview: { eventName: string; location: EventLocation; eventTime: EventTime };
 };
 
 
