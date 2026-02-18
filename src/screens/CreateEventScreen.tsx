@@ -82,7 +82,7 @@ export default function CreateEventScreen({ navigation }: Props) {
       <Button
         title="Choose location"
         onPress={() =>
-          navigation.navigate("ChooseLocation", {
+          navigation.navigate("ChooseTimeAndLocation", {
             eventName: eventName.trim(),
             eventTime: {
               hour: eventTime.getHours(),
@@ -126,3 +126,4 @@ const styles = StyleSheet.create({
   timeButtonText: { fontSize: 16 },
   spacer: { height: 16 },
 });
+

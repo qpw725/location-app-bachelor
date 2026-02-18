@@ -14,9 +14,9 @@ import type { EventLocation, RootStackParamList } from "../../App";
 import StepIndicator from "../components/StepIndicator";
 
 
-type Props = NativeStackScreenProps<RootStackParamList, "ChooseLocation">;
+type Props = NativeStackScreenProps<RootStackParamList, "ChooseTimeAndLocation">;
 
-export default function ChooseLocationScreen({ navigation, route }: Props) {
+export default function ChooseTimeAndLocationScreen({ navigation, route }: Props) {
   const { eventName, eventTime } = route.params;
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NominatimResult[]>([]);
@@ -132,8 +132,8 @@ export default function ChooseLocationScreen({ navigation, route }: Props) {
 
   return (
     <View style={styles.container}>
-      <StepIndicator step={2} total={3} label="Location" />
-      <Text style={styles.title}>Choose location</Text>
+      <StepIndicator step={2} total={3} label="Time and location" />
+      <Text style={styles.title}>Choose time and location</Text>
       <Text style={styles.subtitle}>Event: {eventName}</Text>
 
       <TextInput
@@ -287,3 +287,4 @@ const styles = StyleSheet.create({
   spacer: { height: 16 },
   spacerSmall: { height: 10 },
 });
+
