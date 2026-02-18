@@ -3,8 +3,8 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import StartScreen from "./src/screens/StartScreen";
 import InboxScreen from "./src/screens/InboxScreen";
-import CreateEventScreen from "./src/screens/CreateEventScreen";
-import ChooseTimeAndLocationScreen from "./src/screens/ChooseTimeAndLocationScreen";
+import CreateEventAndTimeScreen from "./src/screens/CreateEventAndTimeScreen";
+import ChooseLocationScreen from "./src/screens/ChooseLocationScreen";
 import InviteScreen from "./src/screens/InviteScreen";
 import EventOverviewScreen from "./src/screens/EventOverviewScreen";
 
@@ -23,8 +23,8 @@ export type EventTime = {
 export type RootStackParamList = {
   Start: undefined;
   Inbox: undefined;
-  CreateEvent: undefined;
-  ChooseTimeAndLocation: { eventName: string; eventTime: EventTime };
+  CreateEventAndTime: undefined;
+  ChooseLocation: { eventName: string; eventTime: EventTime };
   InviteScreen: { eventName: string; location: EventLocation; eventTime: EventTime };
   EventOverview: { eventName: string; location: EventLocation; eventTime: EventTime };
 };
@@ -38,13 +38,14 @@ export default function App() {
       <Stack.Navigator initialRouteName="Start">
         <Stack.Screen name="Start" component={StartScreen} options={{ title: "Home" }} />
         <Stack.Screen name="Inbox" component={InboxScreen} options={{ title: "Inbox" }} />
-        <Stack.Screen name="CreateEvent" component={CreateEventScreen} options={{ title: "Create event" }} />
-        <Stack.Screen name="ChooseTimeAndLocation" component={ChooseTimeAndLocationScreen} options={{ title: "Time and Location" }} />
+        <Stack.Screen name="CreateEventAndTime" component={CreateEventAndTimeScreen} options={{ title: "Create event and time" }} />
+        <Stack.Screen name="ChooseLocation" component={ChooseLocationScreen} options={{ title: "Location" }} />
         <Stack.Screen name="InviteScreen" component={InviteScreen} options={{ title: "Invite" }} />
         <Stack.Screen name="EventOverview" component={EventOverviewScreen}options={{ title: "Event" }}/>
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
+
 
 

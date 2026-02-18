@@ -6,9 +6,9 @@ import type { RootStackParamList } from "../../App";
 import StepIndicator from "../components/StepIndicator";
 
 
-type Props = NativeStackScreenProps<RootStackParamList, "CreateEvent">;
+type Props = NativeStackScreenProps<RootStackParamList, "CreateEventAndTime">;
 
-export default function CreateEventScreen({ navigation }: Props) {
+export default function CreateEventAndTimeScreen({ navigation }: Props) {
   const [eventName, setEventName] = useState("");
   const [eventTime, setEventTime] = useState(() => {
     const now = new Date();
@@ -38,7 +38,7 @@ export default function CreateEventScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <StepIndicator step={1} total={3} label="Create event" />
-      <Text style={styles.title}>Create event</Text>
+      <Text style={styles.title}>Create event and time</Text>
 
       <Text style={styles.label}>Event name</Text>
       <TextInput
@@ -82,7 +82,7 @@ export default function CreateEventScreen({ navigation }: Props) {
       <Button
         title="Choose location"
         onPress={() =>
-          navigation.navigate("ChooseTimeAndLocation", {
+          navigation.navigate("ChooseLocation", {
             eventName: eventName.trim(),
             eventTime: {
               hour: eventTime.getHours(),
@@ -126,4 +126,5 @@ const styles = StyleSheet.create({
   timeButtonText: { fontSize: 16 },
   spacer: { height: 16 },
 });
+
 
