@@ -16,7 +16,7 @@ export default function StartScreen({ navigation }: Props) {
 
       <View style={styles.spacerSmall} />
 
-      <Button title="My invites" onPress={() => navigation.navigate("MyInvites")} />
+      <Button title="Inbox" onPress={() => navigation.navigate("Inbox")} />
     </View>
   );
 }
@@ -28,3 +28,4 @@ const styles = StyleSheet.create({
   spacer: { height: 18 },
   spacerSmall: { height: 12 },
 });
+

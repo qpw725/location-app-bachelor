@@ -2,7 +2,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import StartScreen from "./src/screens/StartScreen";
-import MyInvitesScreen from "./src/screens/MyInvitesScreen";
+import InboxScreen from "./src/screens/InboxScreen";
 import CreateEventScreen from "./src/screens/CreateEventScreen";
 import ChooseTimeAndLocationScreen from "./src/screens/ChooseTimeAndLocationScreen";
 import InviteScreen from "./src/screens/InviteScreen";
@@ -22,7 +22,7 @@ export type EventTime = {
 
 export type RootStackParamList = {
   Start: undefined;
-  MyInvites: undefined;
+  Inbox: undefined;
   CreateEvent: undefined;
   ChooseTimeAndLocation: { eventName: string; eventTime: EventTime };
   InviteScreen: { eventName: string; location: EventLocation; eventTime: EventTime };
@@ -37,7 +37,7 @@ export default function App() {
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Start">
         <Stack.Screen name="Start" component={StartScreen} options={{ title: "Home" }} />
-        <Stack.Screen name="MyInvites" component={MyInvitesScreen} options={{ title: "My invites" }} />
+        <Stack.Screen name="Inbox" component={InboxScreen} options={{ title: "Inbox" }} />
         <Stack.Screen name="CreateEvent" component={CreateEventScreen} options={{ title: "Create event" }} />
         <Stack.Screen name="ChooseTimeAndLocation" component={ChooseTimeAndLocationScreen} options={{ title: "Time and Location" }} />
         <Stack.Screen name="InviteScreen" component={InviteScreen} options={{ title: "Invite" }} />
@@ -46,4 +46,5 @@ export default function App() {
     </NavigationContainer>
   );
 }
+
 
