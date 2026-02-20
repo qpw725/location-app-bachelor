@@ -7,6 +7,7 @@ import CreateEventDetailsScreen from "./src/screens/CreateEventDetailsScreen";
 import ChooseLocationScreen from "./src/screens/ChooseLocationScreen";
 import InviteScreen from "./src/screens/InviteScreen";
 import EventOverviewScreen from "./src/screens/EventOverviewScreen";
+import MyProfileScreen from "./src/screens/MyProfileScreen";
 
 
 export type EventLocation = {
@@ -29,6 +30,7 @@ export type EventDate = {
 export type RootStackParamList = {
   Start: undefined;
   Inbox: undefined;
+  MyProfile: undefined;
   CreateEventDetails: undefined;
   ChooseLocation: { eventName: string; eventTime: EventTime; eventDate: EventDate };
   InviteScreen: { eventName: string; location: EventLocation; eventTime: EventTime; eventDate: EventDate };
@@ -44,6 +46,7 @@ export default function App() {
       <Stack.Navigator initialRouteName="Start">
         <Stack.Screen name="Start" component={StartScreen} options={{ title: "Home" }} />
         <Stack.Screen name="Inbox" component={InboxScreen} options={{ title: "Inbox" }} />
+        <Stack.Screen name="MyProfile" component={MyProfileScreen} options={{ title: "My profile" }} />
         <Stack.Screen name="CreateEventDetails" component={CreateEventDetailsScreen} options={{ title: "Create event and time" }} />
         <Stack.Screen name="ChooseLocation" component={ChooseLocationScreen} options={{ title: "Location" }} />
         <Stack.Screen name="InviteScreen" component={InviteScreen} options={{ title: "Invite" }} />
