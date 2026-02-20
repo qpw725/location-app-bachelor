@@ -17,6 +17,10 @@ export default function StartScreen({ navigation }: Props) {
 
         <View style={styles.spacerSmall} />
 
+        <Button title="Create profile" onPress={() => navigation.navigate("CreateProfile")} />
+
+        <View style={styles.spacerSmall} />
+
         <Button title="Inbox" onPress={() => navigation.navigate("Inbox")} />
       </View>
 
@@ -35,6 +39,5 @@ const styles = StyleSheet.create({
   spacerSmall: { height: 12 },
   bottomTab: { marginTop: "auto", paddingBottom: 12 },
 });
-
 
 
