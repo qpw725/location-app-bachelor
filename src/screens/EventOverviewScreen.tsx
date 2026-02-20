@@ -5,7 +5,7 @@ import type { RootStackParamList } from "../../App";
 type Props = NativeStackScreenProps<RootStackParamList, "EventOverview">;
 
 export default function EventOverviewScreen({ route }: Props) {
-  const { eventName, location, eventTime } = route.params;
+  const { eventName, location, eventTime, eventDate } = route.params;
   const maxLocationLength = 48;
   const locationLabel =
     location.label.length > maxLocationLength
@@ -14,6 +14,12 @@ export default function EventOverviewScreen({ route }: Props) {
   const eventTimeLabel = new Date(0, 0, 0, eventTime.hour, eventTime.minute).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
+  });
+  const eventDateLabel = new Date(eventDate.year, eventDate.month - 1, eventDate.day).toLocaleDateString([], {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
 
   // placeholder participants
@@ -30,6 +36,7 @@ export default function EventOverviewScreen({ route }: Props) {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Event info</Text>
         <Text style={styles.cardText}>Location: {locationLabel}</Text>
+        <Text style={styles.cardText}>Date: {eventDateLabel}</Text>
         <Text style={styles.cardText}>Time: {eventTimeLabel}</Text>
       </View>
 

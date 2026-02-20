@@ -6,22 +6,46 @@ import type { RootStackParamList } from "../../App";
 import StepIndicator from "../components/StepIndicator";
 
 
-type Props = NativeStackScreenProps<RootStackParamList, "CreateEventAndTime">;
+type Props = NativeStackScreenProps<RootStackParamList, "CreateEventDetails">;
 
-export default function CreateEventAndTimeScreen({ navigation }: Props) {
+export default function CreateEventDetailsScreen({ navigation }: Props) {
   const [eventName, setEventName] = useState("");
+  const [eventDate, setEventDate] = useState(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return now;
+  });
   const [eventTime, setEventTime] = useState(() => {
     const now = new Date();
     now.setSeconds(0, 0);
     return now;
   });
+  const [showAndroidDatePicker, setShowAndroidDatePicker] = useState(false);
   const [showAndroidTimePicker, setShowAndroidTimePicker] = useState(false);
 
   const canContinue = eventName.trim().length > 0;
+  const formattedDate = eventDate.toLocaleDateString([], {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
   const formattedTime = eventTime.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   });
+
+  function onDateChange(event: DateTimePickerEvent, selectedDate?: Date) {
+    if (Platform.OS === "android") {
+      setShowAndroidDatePicker(false);
+    }
+
+    if (event.type === "dismissed" || !selectedDate) {
+      return;
+    }
+
+    setEventDate(selectedDate);
+  }
 
   function onTimeChange(event: DateTimePickerEvent, selectedDate?: Date) {
     if (Platform.OS === "android") {
@@ -48,7 +72,36 @@ export default function CreateEventAndTimeScreen({ navigation }: Props) {
         style={styles.input}
       />
 
-      <View style={styles.timeSection}>
+      <View style={styles.pickerSection}>
+        <Text style={styles.label}>Event date</Text>
+
+        {Platform.OS === "ios" ? (
+          <View style={styles.iosPickerWrap}>
+            <DateTimePicker
+              value={eventDate}
+              mode="date"
+              display="compact"
+              onChange={onDateChange}
+            />
+          </View>
+        ) : (
+          <>
+            <Pressable onPress={() => setShowAndroidDatePicker(true)} style={styles.pickerButton}>
+              <Text style={styles.pickerButtonText}>{formattedDate}</Text>
+            </Pressable>
+            {showAndroidDatePicker && (
+              <DateTimePicker
+                value={eventDate}
+                mode="date"
+                display="default"
+                onChange={onDateChange}
+              />
+            )}
+          </>
+        )}
+      </View>
+
+      <View style={styles.pickerSection}>
         <Text style={styles.label}>Event time</Text>
 
         {Platform.OS === "ios" ? (
@@ -56,14 +109,14 @@ export default function CreateEventAndTimeScreen({ navigation }: Props) {
             <DateTimePicker
               value={eventTime}
               mode="time"
-              display="spinner"
+              display="compact"
               onChange={onTimeChange}
             />
           </View>
         ) : (
           <>
-            <Pressable onPress={() => setShowAndroidTimePicker(true)} style={styles.timeButton}>
-              <Text style={styles.timeButtonText}>{formattedTime}</Text>
+            <Pressable onPress={() => setShowAndroidTimePicker(true)} style={styles.pickerButton}>
+              <Text style={styles.pickerButtonText}>{formattedTime}</Text>
             </Pressable>
             {showAndroidTimePicker && (
               <DateTimePicker
@@ -84,6 +137,11 @@ export default function CreateEventAndTimeScreen({ navigation }: Props) {
         onPress={() =>
           navigation.navigate("ChooseLocation", {
             eventName: eventName.trim(),
+            eventDate: {
+              year: eventDate.getFullYear(),
+              month: eventDate.getMonth() + 1,
+              day: eventDate.getDate(),
+            },
             eventTime: {
               hour: eventTime.getHours(),
               minute: eventTime.getMinutes(),
@@ -108,22 +166,23 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 16,
   },
-  timeSection: { marginTop: 14 },
+  pickerSection: { marginTop: 14 },
   iosPickerWrap: {
     borderWidth: 1,
     borderColor: "#ccc",
     borderRadius: 10,
-    paddingTop: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     alignItems: "stretch",
   },
-  timeButton: {
+  pickerButton: {
     borderWidth: 1,
     borderColor: "#ccc",
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
   },
-  timeButtonText: { fontSize: 16 },
+  pickerButtonText: { fontSize: 16 },
   spacer: { height: 16 },
 });
 

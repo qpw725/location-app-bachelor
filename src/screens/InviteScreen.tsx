@@ -8,7 +8,7 @@ import StepIndicator from "../components/StepIndicator";
 type Props = NativeStackScreenProps<RootStackParamList, "InviteScreen">;
 
 export default function InviteScreen({ navigation, route }: Props) {
-  const { eventName, location, eventTime } = route.params;
+  const { eventName, location, eventTime, eventDate } = route.params;
   const [email, setEmail] = useState("");
 
   return (
@@ -31,7 +31,7 @@ export default function InviteScreen({ navigation, route }: Props) {
 
       <Button
         title="Send invite (placeholder)"
-        onPress={() => navigation.navigate("EventOverview", { eventName, location, eventTime })}
+        onPress={() => navigation.navigate("EventOverview", { eventName, location, eventTime, eventDate })}
       />
     </View>
   );

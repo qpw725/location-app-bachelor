@@ -12,7 +12,7 @@ export default function StartScreen({ navigation }: Props) {
 
       <View style={styles.spacer} />
 
-      <Button title="Create event and time" onPress={() => navigation.navigate("CreateEventAndTime")} />
+      <Button title="Create event and time" onPress={() => navigation.navigate("CreateEventDetails")} />
 
       <View style={styles.spacerSmall} />
 
@@ -28,5 +28,6 @@ const styles = StyleSheet.create({
   spacer: { height: 18 },
   spacerSmall: { height: 12 },
 });
+
 
 
