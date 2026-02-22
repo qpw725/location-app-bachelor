@@ -13,7 +13,7 @@ export default function StartScreen({ navigation }: Props) {
 
         <View style={styles.spacer} />
 
-        <Button title="Create event and time" onPress={() => navigation.navigate("CreateEventDetails")} />
+        <Button title="Create event" onPress={() => navigation.navigate("CreateEventDetails")} />
 
         <View style={styles.spacerSmall} />
 
