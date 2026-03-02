@@ -1,18 +1,10 @@
-import { View, Text, Button, StyleSheet } from "react-native";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { RootStackParamList } from "../../App";
+import { View, Text, StyleSheet } from "react-native";
 
-type Props = NativeStackScreenProps<RootStackParamList, "Inbox">;
-
-export default function InboxScreen({ navigation }: Props) {
+export default function InboxScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Inbox</Text>
       <Text style={styles.subtitle}>Placeholder inbox for now</Text>
-
-      <View style={{ height: 16 }} />
-
-      <Button title="Back" onPress={() => navigation.goBack()} />
     </View>
   );
 }

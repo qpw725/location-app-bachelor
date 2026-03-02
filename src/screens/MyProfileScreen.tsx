@@ -1,10 +1,6 @@
 import { View, Text, StyleSheet } from "react-native";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { RootStackParamList } from "../../App";
 
-type Props = NativeStackScreenProps<RootStackParamList, "MyProfile">;
-
-export default function MyProfileScreen({}: Props) {
+export default function MyProfileScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>My profile</Text>
@@ -24,7 +20,7 @@ export default function MyProfileScreen({}: Props) {
         <View style={styles.spacerSmall} />
 
         <Text style={styles.label}>Location</Text>
-        <Text style={styles.value}>Aarhus, Denmark</Text>
+        <Text style={styles.value}>Copenhagen, Denmark</Text>
       </View>
     </View>
   );

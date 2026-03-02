@@ -1,4 +1,6 @@
 import { NavigationContainer } from "@react-navigation/native";
+import { NavigatorScreenParams } from "@react-navigation/native";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import StartScreen from "./src/screens/StartScreen";
@@ -29,9 +31,7 @@ export type EventDate = {
 };
 
 export type RootStackParamList = {
-  Start: undefined;
-  Inbox: undefined;
-  MyProfile: undefined;
+  MainTabs: NavigatorScreenParams<MainTabParamList>;
   CreateProfile: undefined;
   CreateEventDetails: undefined;
   ChooseLocation: { eventName: string; eventTime: EventTime; eventDate: EventDate };
@@ -39,16 +39,30 @@ export type RootStackParamList = {
   EventOverview: { eventName: string; location: EventLocation; eventTime: EventTime; eventDate: EventDate };
 };
 
+export type MainTabParamList = {
+  Start: undefined;
+  Inbox: undefined;
+  MyProfile: undefined;
+};
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator<MainTabParamList>();
+
+function MainTabs() {
+  return (
+    <Tab.Navigator>
+      <Tab.Screen name="Start" component={StartScreen} options={{ title: "Home", headerTitle: "Home"}} />
+      <Tab.Screen name="Inbox" component={InboxScreen} options={{ title: "Inbox", headerTitle: "Inbox" }} />
+      <Tab.Screen name="MyProfile" component={MyProfileScreen} options={{ title: "Profile", headerTitle: "My profile" }} />
+    </Tab.Navigator>
+  );
+}
 
 export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Start">
-        <Stack.Screen name="Start" component={StartScreen} options={{ title: "Home" }} />
-        <Stack.Screen name="Inbox" component={InboxScreen} options={{ title: "Inbox" }} />
-        <Stack.Screen name="MyProfile" component={MyProfileScreen} options={{ title: "My profile" }} />
+      <Stack.Navigator initialRouteName="MainTabs">
+        <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
         <Stack.Screen name="CreateProfile" component={CreateProfileScreen} options={{ title: "Create profile" }} />
         <Stack.Screen name="CreateEventDetails" component={CreateEventDetailsScreen} options={{ title: "Create event and time" }} />
         <Stack.Screen name="ChooseLocation" component={ChooseLocationScreen} options={{ title: "Location" }} />
