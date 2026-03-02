@@ -8,7 +8,6 @@ import EventsScreen from "./src/screens/EventsScreen";
 import InboxScreen from "./src/screens/InboxScreen";
 import CreateEventDetailsScreen from "./src/screens/CreateEventDetailsScreen";
 import ChooseLocationScreen from "./src/screens/ChooseLocationScreen";
-import InviteScreen from "./src/screens/InviteScreen";
 import EventOverviewScreen from "./src/screens/EventOverviewScreen";
 import MyProfileScreen from "./src/screens/MyProfileScreen";
 import CreateProfileScreen from "./src/screens/CreateProfileScreen";
@@ -44,7 +43,6 @@ export type RootStackParamList = {
   PastEvents: undefined;
   CreateEventDetails: undefined;
   ChooseLocation: { eventName: string; eventTime: EventTime; eventDate: EventDate };
-  InviteScreen: { eventName: string; location: EventLocation; eventTime: EventTime; eventDate: EventDate };
   EventOverview: { eventName: string; location: EventLocation; eventTime: EventTime; eventDate: EventDate };
 };
 
@@ -110,14 +108,9 @@ export default function App() {
           options={{ title: "Location", headerBackTitle: "Event details" }}
         />
         <Stack.Screen
-          name="InviteScreen"
-          component={InviteScreen}
-          options={{ title: "Invite", headerBackTitle: "Location" }}
-        />
-        <Stack.Screen
           name="EventOverview"
           component={EventOverviewScreen}
-          options={{ title: "Event", headerBackTitle: "Invite" }}
+          options={{ title: "Event", headerBackTitle: "Location" }}
         />
       </Stack.Navigator>
     </NavigationContainer>

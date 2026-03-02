@@ -127,7 +127,7 @@ export default function ChooseLocationScreen({ navigation, route }: Props) {
 
   function goNext() {
     if (!selected) return;
-    navigation.navigate("InviteScreen", { eventName, location: selected, eventTime, eventDate });
+    navigation.navigate("EventOverview", { eventName, location: selected, eventTime, eventDate });
   }
 
   return (
@@ -204,7 +204,7 @@ export default function ChooseLocationScreen({ navigation, route }: Props) {
       )}
 
       <Pressable onPress={goNext} disabled={!selected} style={[styles.nextBtn, !selected && styles.nextBtnDisabled]}>
-        <Text style={styles.nextBtnText}>Continue to invites</Text>
+        <Text style={styles.nextBtnText}>Continue to finalize</Text>
       </Pressable>
 
       <View style={styles.spacerSmall} />
@@ -287,5 +287,4 @@ const styles = StyleSheet.create({
   spacer: { height: 16 },
   spacerSmall: { height: 10 },
 });
-
 
