@@ -39,7 +39,6 @@ export default function InboxScreen() {
         </Pressable>
       ))}
 
-      <View style={styles.bottomPlaceholder} />
     </ScrollView>
   );
 }
