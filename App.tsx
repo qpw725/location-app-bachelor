@@ -74,17 +74,52 @@ export default function App() {
     <NavigationContainer>
       <Stack.Navigator initialRouteName="MainTabs">
         <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
-        <Stack.Screen name="CreateProfile" component={CreateProfileScreen} options={{ title: "Create profile" }} />
-        <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ title: "Notifications" }} />
-        <Stack.Screen name="AttendingEvents" component={AttendingEventsScreen} options={{ title: "Attending" }} />
-        <Stack.Screen name="HostingEvents" component={HostingEventsScreen} options={{ title: "Hosting" }} />
-        <Stack.Screen name="PastEvents" component={PastEventsScreen} options={{ title: "Past" }} />
-        <Stack.Screen name="CreateEventDetails" component={CreateEventDetailsScreen} options={{ title: "Create event and time" }} />
-        <Stack.Screen name="ChooseLocation" component={ChooseLocationScreen} options={{ title: "Location" }} />
-        <Stack.Screen name="InviteScreen" component={InviteScreen} options={{ title: "Invite" }} />
-        <Stack.Screen name="EventOverview" component={EventOverviewScreen}options={{ title: "Event" }}/>
+        <Stack.Screen
+          name="CreateProfile"
+          component={CreateProfileScreen}
+          options={{ title: "Create profile", headerBackTitle: "Home" }}
+        />
+        <Stack.Screen
+          name="NotificationSettings"
+          component={NotificationSettingsScreen}
+          options={{ title: "Notifications", headerBackTitle: "Profile" }}
+        />
+        <Stack.Screen
+          name="AttendingEvents"
+          component={AttendingEventsScreen}
+          options={{ title: "Attending", headerBackTitle: "Events" }}
+        />
+        <Stack.Screen
+          name="HostingEvents"
+          component={HostingEventsScreen}
+          options={{ title: "Hosting", headerBackTitle: "Events" }}
+        />
+        <Stack.Screen
+          name="PastEvents"
+          component={PastEventsScreen}
+          options={{ title: "Past", headerBackTitle: "Events" }}
+        />
+        <Stack.Screen
+          name="CreateEventDetails"
+          component={CreateEventDetailsScreen}
+          options={{ title: "Create event and time", headerBackTitle: "Home" }}
+        />
+        <Stack.Screen
+          name="ChooseLocation"
+          component={ChooseLocationScreen}
+          options={{ title: "Location", headerBackTitle: "Event details" }}
+        />
+        <Stack.Screen
+          name="InviteScreen"
+          component={InviteScreen}
+          options={{ title: "Invite", headerBackTitle: "Location" }}
+        />
+        <Stack.Screen
+          name="EventOverview"
+          component={EventOverviewScreen}
+          options={{ title: "Event", headerBackTitle: "Invite" }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
-

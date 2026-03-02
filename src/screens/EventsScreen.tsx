@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ScrollView, View, Text, StyleSheet, Pressable, TextInput } from "react-native";
+import { useState, useMemo } from "react";
+import { ScrollView, View, Text, StyleSheet, Pressable, TextInput, PanResponder } from "react-native";
 import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { CompositeScreenProps } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -127,8 +127,33 @@ export default function EventsScreen({ navigation }: Props) {
     );
   }
 
+  const swipeResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          const isHorizontalSwipe = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+          return isHorizontalSwipe && Math.abs(gestureState.dx) > 20;
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          if (gestureState.dx < -50) {
+            setActiveView("discover");
+            return;
+          }
+
+          if (gestureState.dx > 50) {
+            setActiveView("myEvents");
+          }
+        },
+      }),
+    []
+  );
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      {...swipeResponder.panHandlers}
+    >
       <View style={styles.hero}>
         <Text style={styles.heroEyebrow}>EVENTS</Text>
         <Text style={styles.heroTitle}>Your event timeline</Text>
