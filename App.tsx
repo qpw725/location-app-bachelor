@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import StartScreen from "./src/screens/StartScreen";
+import EventsScreen from "./src/screens/EventsScreen";
 import InboxScreen from "./src/screens/InboxScreen";
 import CreateEventDetailsScreen from "./src/screens/CreateEventDetailsScreen";
 import ChooseLocationScreen from "./src/screens/ChooseLocationScreen";
@@ -41,6 +42,7 @@ export type RootStackParamList = {
 
 export type MainTabParamList = {
   Start: undefined;
+  Events: undefined;
   Inbox: undefined;
   MyProfile: undefined;
 };
@@ -51,7 +53,8 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 function MainTabs() {
   return (
     <Tab.Navigator>
-      <Tab.Screen name="Start" component={StartScreen} options={{ title: "Home", headerTitle: "Home"}} />
+      <Tab.Screen name="Start" component={StartScreen} options={{ title: "Home", headerTitle: "Home" }} />
+      <Tab.Screen name="Events" component={EventsScreen} options={{ title: "Events", headerTitle: "Events" }} />
       <Tab.Screen name="Inbox" component={InboxScreen} options={{ title: "Inbox", headerTitle: "Inbox" }} />
       <Tab.Screen name="MyProfile" component={MyProfileScreen} options={{ title: "Profile", headerTitle: "My profile" }} />
     </Tab.Navigator>
@@ -72,7 +75,6 @@ export default function App() {
     </NavigationContainer>
   );
 }
-
 
 
 
