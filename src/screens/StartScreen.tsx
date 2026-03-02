@@ -41,7 +41,12 @@ export default function StartScreen({ navigation }: Props) {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Overview</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Overview</Text>
+          <Pressable onPress={() => navigation.navigate("Events")}>
+            <Text style={styles.sectionAction}>View events</Text>
+          </Pressable>
+        </View>
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>0</Text>

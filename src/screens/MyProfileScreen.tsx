@@ -1,44 +1,144 @@
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
+import { CompositeScreenProps } from "@react-navigation/native";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import type { MainTabParamList, RootStackParamList } from "../../App";
 
-export default function MyProfileScreen() {
+type Props = CompositeScreenProps<
+  BottomTabScreenProps<MainTabParamList, "MyProfile">,
+  NativeStackScreenProps<RootStackParamList>
+>;
+
+export default function MyProfileScreen({ navigation }: Props) {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>My profile</Text>
-      <Text style={styles.subtitle}>Account details (placeholder)</Text>
-
-      <View style={styles.spacer} />
-
-      <View style={styles.card}>
-        <Text style={styles.label}>Username</Text>
-        <Text style={styles.value}>benjamin_123</Text>
-
-        <View style={styles.spacerSmall} />
-
-        <Text style={styles.label}>Email</Text>
-        <Text style={styles.value}>benjamin@example.com</Text>
-
-        <View style={styles.spacerSmall} />
-
-        <Text style={styles.label}>Location</Text>
-        <Text style={styles.value}>Copenhagen, Denmark</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.avatarWrap}>
+        <View style={styles.avatarCircle}>
+          <View style={styles.avatarHead} />
+          <View style={styles.avatarBody} />
+        </View>
       </View>
-    </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Information</Text>
+
+        <View style={styles.card}>
+          <Text style={styles.name}>Noe Sorensen</Text>
+          <Text style={styles.username}>noe.sorensen</Text>
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoIcon}>✉</Text>
+            <Text style={styles.infoText}>noetheo@gmail.com</Text>
+            <Text style={styles.rowArrow}>→</Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoIcon}>⌖</Text>
+            <Text style={styles.infoText}>Copenhagen, Denmark</Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoIcon}>▦</Text>
+            <Text style={styles.infoText}>Member since 2026</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Settings</Text>
+        <Pressable
+          style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}
+          onPress={() => navigation.navigate("NotificationSettings")}
+        >
+          <Text style={styles.settingsText}>Notifications</Text>
+          <Text style={styles.rowArrow}>→</Text>
+        </Pressable>
+      </View>
+
+      
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, justifyContent: "center" },
-  title: { fontSize: 24, fontWeight: "700", marginBottom: 6 },
-  subtitle: { fontSize: 14, opacity: 0.7 },
+  container: { flex: 1, backgroundColor: "#eeeeee" },
+  content: { padding: 14, paddingBottom: 24 },
+  avatarWrap: { alignItems: "center", marginTop: 6, marginBottom: 16 },
+  avatarCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "#cbcbcd",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarHead: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#eaeaea",
+    marginBottom: 6,
+  },
+  avatarBody: {
+    width: 62,
+    height: 38,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
+    backgroundColor: "#eaeaea",
+  },
+  section: { marginBottom: 14 },
+  sectionTitle: { fontSize: 24, fontWeight: "700", marginBottom: 8, color: "#111111" },
   card: {
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 12,
+    borderColor: "#d2d2d2",
+    borderRadius: 16,
     padding: 16,
-    backgroundColor: "#fff",
+    backgroundColor: "#f6f6f6",
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  label: { fontSize: 13, opacity: 0.7, marginBottom: 2 },
-  value: { fontSize: 18, fontWeight: "600" },
-  spacer: { height: 18 },
-  spacerSmall: { height: 14 },
+  name: { fontSize: 32, fontWeight: "500", color: "#111111", marginBottom: 2 },
+  username: { fontSize: 29, color: "#5f5f5f", marginBottom: 8 },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  infoIcon: { fontSize: 22, color: "#111111", width: 28 },
+  infoText: { fontSize: 24, color: "#111111", flex: 1, marginLeft: 6 },
+  rowArrow: { fontSize: 28, color: "#111111", marginLeft: 8 },
+  settingsRow: {
+    borderWidth: 1,
+    borderColor: "#d2d2d2",
+    borderRadius: 16,
+    backgroundColor: "#f6f6f6",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  settingsText: {
+    fontSize: 22,
+    color: "#111111",
+    flex: 1,
+  },
+  pressed: { opacity: 0.86 },
+  bottomPlaceholder: {
+    marginTop: 14,
+    height: 84,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#dcdcdc",
+    backgroundColor: "#f3f3f3",
+  },
 });
