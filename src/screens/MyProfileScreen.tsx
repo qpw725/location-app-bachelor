@@ -27,18 +27,18 @@ export default function MyProfileScreen({ navigation }: Props) {
           <Text style={styles.username}>noe.sorensen</Text>
 
           <View style={styles.infoRow}>
-            <Text style={styles.infoIcon}>✉</Text>
+            <Text style={styles.infoIcon}>@</Text>
             <Text style={styles.infoText}>noetheo@gmail.com</Text>
-            <Text style={styles.rowArrow}>→</Text>
+            <Text style={styles.rowArrow}>{">"}</Text>
           </View>
 
           <View style={styles.infoRow}>
-            <Text style={styles.infoIcon}>⌖</Text>
+            <Text style={styles.infoIcon}>o</Text>
             <Text style={styles.infoText}>Copenhagen, Denmark</Text>
           </View>
 
           <View style={styles.infoRow}>
-            <Text style={styles.infoIcon}>▦</Text>
+            <Text style={styles.infoIcon}>#</Text>
             <Text style={styles.infoText}>Member since 2026</Text>
           </View>
         </View>
@@ -51,11 +51,16 @@ export default function MyProfileScreen({ navigation }: Props) {
           onPress={() => navigation.navigate("NotificationSettings")}
         >
           <Text style={styles.settingsText}>Notifications</Text>
-          <Text style={styles.rowArrow}>→</Text>
+          <Text style={styles.rowArrow}>{">"}</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.settingsRow, styles.settingsRowSpacing, pressed && styles.pressed]}
+          onPress={() => {}}
+        >
+          <Text style={styles.settingsText}>Log off</Text>
+          <Text style={styles.rowArrow}>{">"}</Text>
         </Pressable>
       </View>
-
-      
     </ScrollView>
   );
 }
@@ -127,18 +132,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
+  settingsRowSpacing: {
+    marginTop: 10,
+  },
   settingsText: {
     fontSize: 22,
     color: "#111111",
     flex: 1,
   },
   pressed: { opacity: 0.86 },
-  bottomPlaceholder: {
-    marginTop: 14,
-    height: 84,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#dcdcdc",
-    backgroundColor: "#f3f3f3",
-  },
 });

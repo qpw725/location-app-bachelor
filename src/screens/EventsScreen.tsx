@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ScrollView, View, Text, StyleSheet, Pressable } from "react-native";
+import { ScrollView, View, Text, StyleSheet, Pressable, TextInput } from "react-native";
 import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { CompositeScreenProps } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -69,7 +69,7 @@ function CategoryCard({
           <Text style={styles.categoryLabel}>{label}</Text>
           <Text style={styles.categoryCount}>{count} events</Text>
         </View>
-        <Text style={styles.categoryArrow}>→</Text> {/* Simple arrow, can be replaced with an icon if desired */}
+        <Text style={styles.categoryArrow}>{">"}</Text>
       </View>
 
       {preview ? (
@@ -85,6 +85,47 @@ function CategoryCard({
 
 export default function EventsScreen({ navigation }: Props) {
   const [activeView, setActiveView] = useState<"myEvents" | "discover">("myEvents");
+  const [discoverSearch, setDiscoverSearch] = useState("");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [locationFilter, setLocationFilter] = useState<"Any" | "Nearby" | "City Center">("Any");
+  const [timeFilter, setTimeFilter] = useState<"Any" | "Today" | "This Week">("Any");
+
+  const categoryOptions = ["Relaxed social", "Casual networking", "Games and drinks", "Fitness group"];
+
+  const filteredDiscoverEvents = discoverEvents.filter((event) => {
+    const query = discoverSearch.trim().toLowerCase();
+    const matchesSearch =
+      query.length === 0 ||
+      event.title.toLowerCase().includes(query) ||
+      event.place.toLowerCase().includes(query) ||
+      event.host.toLowerCase().includes(query) ||
+      event.vibe.toLowerCase().includes(query);
+
+    const matchesCategory =
+      selectedCategories.length === 0 || selectedCategories.includes(event.vibe);
+
+    const lowerPlace = event.place.toLowerCase();
+    const matchesLocation =
+      locationFilter === "Any" ||
+      (locationFilter === "Nearby" && !lowerPlace.includes("city center")) ||
+      (locationFilter === "City Center" && lowerPlace.includes("city center"));
+
+    const lowerTime = event.time.toLowerCase();
+    const matchesTime =
+      timeFilter === "Any" ||
+      (timeFilter === "Today" && lowerTime.includes("today")) ||
+      (timeFilter === "This Week" && !lowerTime.includes("today"));
+
+    return matchesSearch && matchesCategory && matchesLocation && matchesTime;
+  });
+
+  function toggleCategory(category: string) {
+    setSelectedCategories((prev) =>
+      prev.includes(category)
+        ? prev.filter((item) => item !== category)
+        : [...prev, category]
+    );
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -132,10 +173,84 @@ export default function EventsScreen({ navigation }: Props) {
         </View>
       ) : (
         <View style={styles.section}>
+          <TextInput
+            value={discoverSearch}
+            onChangeText={setDiscoverSearch}
+            placeholder="Search events"
+            placeholderTextColor="#7a869b"
+            style={styles.searchInput}
+          />
+
+          <View style={styles.filterBlock}>
+            <Text style={styles.filterLabel}>Categories</Text>
+            <View style={styles.filterRow}>
+              {categoryOptions.map((category) => (
+                <Pressable
+                  key={category}
+                  style={[
+                    styles.filterChip,
+                    selectedCategories.includes(category) && styles.filterChipActive,
+                  ]}
+                  onPress={() => toggleCategory(category)}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      selectedCategories.includes(category) && styles.filterChipTextActive,
+                    ]}
+                  >
+                    {category}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.filterLabel}>Distance / Location</Text>
+            <View style={styles.filterRow}>
+              {(["Any", "Nearby", "City Center"] as const).map((option) => (
+                <Pressable
+                  key={option}
+                  style={[styles.filterChip, locationFilter === option && styles.filterChipActive]}
+                  onPress={() => setLocationFilter(option)}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      locationFilter === option && styles.filterChipTextActive,
+                    ]}
+                  >
+                    {option}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.filterLabel}>Time / Date</Text>
+            <View style={styles.filterRow}>
+              {(["Any", "Today", "This Week"] as const).map((option) => (
+                <Pressable
+                  key={option}
+                  style={[styles.filterChip, timeFilter === option && styles.filterChipActive]}
+                  onPress={() => setTimeFilter(option)}
+                >
+                  <Text style={[styles.filterChipText, timeFilter === option && styles.filterChipTextActive]}>
+                    {option}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
           <Text style={styles.sectionTitle}>Discover public events</Text>
-          {discoverEvents.map((event) => (
+          {filteredDiscoverEvents.map((event) => (
             <DiscoverEventCard key={event.title} {...event} />
           ))}
+          {filteredDiscoverEvents.length === 0 && (
+            <View style={styles.discoverCard}>
+              <Text style={styles.eventTitle}>No events match your filters</Text>
+              <Text style={styles.eventMeta}>Try changing search text or filters.</Text>
+            </View>
+          )}
         </View>
       )}
     </ScrollView>
@@ -183,6 +298,57 @@ const styles = StyleSheet.create({
   segmentTextActive: { color: "#1a2233" },
   section: { marginBottom: 20 },
   sectionTitle: { fontSize: 20, fontWeight: "700", color: "#1a2233", marginBottom: 10 },
+  searchInput: {
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#d8e1f2",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: "#1a2233",
+    marginBottom: 12,
+  },
+  filterBlock: {
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e4eaf5",
+    padding: 12,
+    marginBottom: 12,
+  },
+  filterLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#33415c",
+    marginBottom: 8,
+  },
+  filterRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  filterChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#d8e1f2",
+    backgroundColor: "#f7f9fd",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  filterChipActive: {
+    backgroundColor: "#1f4fa3",
+    borderColor: "#1f4fa3",
+  },
+  filterChipText: {
+    fontSize: 12,
+    color: "#4c5e7b",
+    fontWeight: "600",
+  },
+  filterChipTextActive: {
+    color: "#ffffff",
+  },
   categoryCard: {
     backgroundColor: "#ffffff",
     borderRadius: 16,
