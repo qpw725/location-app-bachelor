@@ -1,8 +1,10 @@
+import { useEffect, useState } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { CompositeScreenProps } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainTabParamList, RootStackParamList } from "../../App";
+import { supabase } from "../supabase";
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, "MyProfile">,
@@ -10,6 +12,18 @@ type Props = CompositeScreenProps<
 >;
 
 export default function MyProfileScreen({ navigation }: Props) {
+  const [userEmail, setUserEmail] = useState("No email found");
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUserEmail(data.user?.email ?? "No email found");
+    });
+  }, []);
+
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+  }
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.avatarWrap}>
@@ -28,7 +42,7 @@ export default function MyProfileScreen({ navigation }: Props) {
 
           <View style={styles.infoRow}>
             <Text style={styles.infoIcon}>@</Text>
-            <Text style={styles.infoText}>noetheo@gmail.com</Text>
+            <Text style={styles.infoText}>{userEmail}</Text>
             <Text style={styles.rowArrow}>{">"}</Text>
           </View>
 
@@ -55,7 +69,7 @@ export default function MyProfileScreen({ navigation }: Props) {
         </Pressable>
         <Pressable
           style={({ pressed }) => [styles.settingsRow, styles.settingsRowSpacing, pressed && styles.pressed]}
-          onPress={() => {}}
+          onPress={handleSignOut}
         >
           <Text style={styles.settingsText}>Log off</Text>
           <Text style={styles.rowArrow}>{">"}</Text>

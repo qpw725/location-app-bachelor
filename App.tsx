@@ -1,7 +1,10 @@
+import { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { NavigatorScreenParams } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { ActivityIndicator, View } from "react-native";
+import { Session } from "@supabase/supabase-js";
 
 import StartScreen from "./src/screens/StartScreen";
 import EventsScreen from "./src/screens/EventsScreen";
@@ -15,6 +18,9 @@ import NotificationSettingsScreen from "./src/screens/NotificationSettingsScreen
 import AttendingEventsScreen from "./src/screens/AttendingEventsScreen";
 import HostingEventsScreen from "./src/screens/HostingEventsScreen";
 import PastEventsScreen from "./src/screens/PastEventsScreen";
+import LoginScreen from "./src/screens/LoginScreen";
+import RegisterScreen from "./src/screens/RegisterScreen";
+import { supabase } from "./src/supabase";
 
 
 export type EventLocation = {
@@ -53,8 +59,23 @@ export type MainTabParamList = {
   MyProfile: undefined;
 };
 
+type AuthStackParamList = {
+  Login: undefined;
+  Register: undefined;
+};
+
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
+const AuthStack = createNativeStackNavigator<AuthStackParamList>();
+
+function AuthScreens() {
+  return (
+    <AuthStack.Navigator>
+      <AuthStack.Screen name="Login" component={LoginScreen} options={{ title: "Login" }} />
+      <AuthStack.Screen name="Register" component={RegisterScreen} options={{ title: "Register" }} />
+    </AuthStack.Navigator>
+  );
+}
 
 function MainTabs() {
   return (
@@ -68,51 +89,89 @@ function MainTabs() {
 }
 
 export default function App() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      if (isMounted) {
+        setSession(currentSession);
+        setIsLoadingSession(false);
+      }
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, activeSession) => {
+      setSession(activeSession);
+      setIsLoadingSession(false);
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  if (isLoadingSession) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="MainTabs">
-        <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
-        <Stack.Screen
-          name="CreateProfile"
-          component={CreateProfileScreen}
-          options={{ title: "Create profile", headerBackTitle: "Home" }}
-        />
-        <Stack.Screen
-          name="NotificationSettings"
-          component={NotificationSettingsScreen}
-          options={{ title: "Notifications", headerBackTitle: "Profile" }}
-        />
-        <Stack.Screen
-          name="AttendingEvents"
-          component={AttendingEventsScreen}
-          options={{ title: "Attending", headerBackTitle: "Events" }}
-        />
-        <Stack.Screen
-          name="HostingEvents"
-          component={HostingEventsScreen}
-          options={{ title: "Hosting", headerBackTitle: "Events" }}
-        />
-        <Stack.Screen
-          name="PastEvents"
-          component={PastEventsScreen}
-          options={{ title: "Past", headerBackTitle: "Events" }}
-        />
-        <Stack.Screen
-          name="CreateEventDetails"
-          component={CreateEventDetailsScreen}
-          options={{ title: "Create event and time", headerBackTitle: "Home" }}
-        />
-        <Stack.Screen
-          name="ChooseLocation"
-          component={ChooseLocationScreen}
-          options={{ title: "Location", headerBackTitle: "Event details" }}
-        />
-        <Stack.Screen
-          name="EventOverview"
-          component={EventOverviewScreen}
-          options={{ title: "Event", headerBackTitle: "Location" }}
-        />
-      </Stack.Navigator>
+      {session ? (
+        <Stack.Navigator initialRouteName="MainTabs">
+          <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
+          <Stack.Screen
+            name="CreateProfile"
+            component={CreateProfileScreen}
+            options={{ title: "Create profile", headerBackTitle: "Home" }}
+          />
+          <Stack.Screen
+            name="NotificationSettings"
+            component={NotificationSettingsScreen}
+            options={{ title: "Notifications", headerBackTitle: "Profile" }}
+          />
+          <Stack.Screen
+            name="AttendingEvents"
+            component={AttendingEventsScreen}
+            options={{ title: "Attending", headerBackTitle: "Events" }}
+          />
+          <Stack.Screen
+            name="HostingEvents"
+            component={HostingEventsScreen}
+            options={{ title: "Hosting", headerBackTitle: "Events" }}
+          />
+          <Stack.Screen
+            name="PastEvents"
+            component={PastEventsScreen}
+            options={{ title: "Past", headerBackTitle: "Events" }}
+          />
+          <Stack.Screen
+            name="CreateEventDetails"
+            component={CreateEventDetailsScreen}
+            options={{ title: "Create event and time", headerBackTitle: "Home" }}
+          />
+          <Stack.Screen
+            name="ChooseLocation"
+            component={ChooseLocationScreen}
+            options={{ title: "Location", headerBackTitle: "Event details" }}
+          />
+          <Stack.Screen
+            name="EventOverview"
+            component={EventOverviewScreen}
+            options={{ title: "Event", headerBackTitle: "Location" }}
+          />
+        </Stack.Navigator>
+      ) : (
+        <AuthScreens />
+      )}
     </NavigationContainer>
   );
 }
