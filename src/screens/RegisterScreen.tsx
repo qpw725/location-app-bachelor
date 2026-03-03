@@ -13,18 +13,27 @@ type Props = NativeStackScreenProps<AuthStackParamList, "Register">;
 export default function RegisterScreen({ navigation }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function handleRegister() {
-    if (!email || !password) {
-      setErrorMessage("Please enter both email and password.");
+    if (!email || !password || !username || !firstName || !lastName || !dateOfBirth) {
+      setErrorMessage("Please fill out all fields.");
       return;
     }
 
     if (password.length < 6) {
       setErrorMessage("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth.trim())) {
+      setErrorMessage("Date of birth must be in format YYYY-MM-DD.");
       return;
     }
 
@@ -35,6 +44,14 @@ export default function RegisterScreen({ navigation }: Props) {
     const { error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
+      options: {
+        data: {
+          username: username.trim(),
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          date_of_birth: dateOfBirth.trim(),
+        },
+      },
     });
 
     if (error) {
@@ -59,6 +76,40 @@ export default function RegisterScreen({ navigation }: Props) {
         autoCapitalize="none"
         keyboardType="email-address"
         placeholder="you@example.com"
+      />
+
+      <Text style={styles.label}>Username</Text>
+      <TextInput
+        value={username}
+        onChangeText={setUsername}
+        style={styles.input}
+        autoCapitalize="none"
+        placeholder="your.username"
+      />
+
+      <Text style={styles.label}>First name</Text>
+      <TextInput
+        value={firstName}
+        onChangeText={setFirstName}
+        style={styles.input}
+        placeholder="First name"
+      />
+
+      <Text style={styles.label}>Last name</Text>
+      <TextInput
+        value={lastName}
+        onChangeText={setLastName}
+        style={styles.input}
+        placeholder="Last name"
+      />
+
+      <Text style={styles.label}>Date of birth</Text>
+      <TextInput
+        value={dateOfBirth}
+        onChangeText={setDateOfBirth}
+        style={styles.input}
+        autoCapitalize="none"
+        placeholder="YYYY-MM-DD"
       />
 
       <Text style={styles.label}>Password</Text>
