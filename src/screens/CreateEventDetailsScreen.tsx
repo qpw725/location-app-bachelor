@@ -10,6 +10,7 @@ type Props = NativeStackScreenProps<RootStackParamList, "CreateEventDetails">;
 
 export default function CreateEventDetailsScreen({ navigation }: Props) {
   const [eventName, setEventName] = useState("");
+  const [eventDescription, setEventDescription] = useState("");
   const [eventDate, setEventDate] = useState(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
@@ -20,10 +21,36 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
     now.setSeconds(0, 0);
     return now;
   });
+  const [eventEndTime, setEventEndTime] = useState(() => {
+    const now = new Date();
+    now.setSeconds(0, 0);
+    now.setHours(now.getHours() + 2);
+    return now;
+  });
   const [showAndroidDatePicker, setShowAndroidDatePicker] = useState(false);
   const [showAndroidTimePicker, setShowAndroidTimePicker] = useState(false);
+  const [showAndroidEndTimePicker, setShowAndroidEndTimePicker] = useState(false);
 
-  const canContinue = eventName.trim().length > 0;
+  const eventStartOnDate = new Date(
+    eventDate.getFullYear(),
+    eventDate.getMonth(),
+    eventDate.getDate(),
+    eventTime.getHours(),
+    eventTime.getMinutes(),
+    0,
+    0
+  );
+  const eventEndOnDate = new Date(
+    eventDate.getFullYear(),
+    eventDate.getMonth(),
+    eventDate.getDate(),
+    eventEndTime.getHours(),
+    eventEndTime.getMinutes(),
+    0,
+    0
+  );
+  const hasValidTimeRange = eventEndOnDate.getTime() > eventStartOnDate.getTime();
+  const canContinue = eventName.trim().length > 0 && hasValidTimeRange;
   const formattedDate = eventDate.toLocaleDateString([], {
     weekday: "short",
     day: "2-digit",
@@ -31,6 +58,10 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
     year: "numeric",
   });
   const formattedTime = eventTime.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const formattedEndTime = eventEndTime.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -59,6 +90,18 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
     setEventTime(selectedDate);
   }
 
+  function onEndTimeChange(event: DateTimePickerEvent, selectedDate?: Date) {
+    if (Platform.OS === "android") {
+      setShowAndroidEndTimePicker(false);
+    }
+
+    if (event.type === "dismissed" || !selectedDate) {
+      return;
+    }
+
+    setEventEndTime(selectedDate);
+  }
+
   return (
     <View style={styles.container}>
       <StepIndicator step={1} total={3} label="Create event" />
@@ -70,6 +113,16 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
         onChangeText={setEventName}
         placeholder="e.g. Pre-drinks at Bens"
         style={styles.input}
+      />
+
+      <Text style={styles.label}>Description (optional)</Text>
+      <TextInput
+        value={eventDescription}
+        onChangeText={setEventDescription}
+        placeholder="What is this event about?"
+        style={[styles.input, styles.descriptionInput]}
+        multiline
+        textAlignVertical="top"
       />
 
       <View style={styles.pickerSection}>
@@ -102,7 +155,7 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
       </View>
 
       <View style={styles.pickerSection}>
-        <Text style={styles.label}>Event time</Text>
+        <Text style={styles.label}>Start time</Text>
 
         {Platform.OS === "ios" ? (
           <View style={styles.iosPickerWrap}>
@@ -130,6 +183,37 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
         )}
       </View>
 
+      <View style={styles.pickerSection}>
+        <Text style={styles.label}>End time</Text>
+
+        {Platform.OS === "ios" ? (
+          <View style={styles.iosPickerWrap}>
+            <DateTimePicker
+              value={eventEndTime}
+              mode="time"
+              display="compact"
+              onChange={onEndTimeChange}
+            />
+          </View>
+        ) : (
+          <>
+            <Pressable onPress={() => setShowAndroidEndTimePicker(true)} style={styles.pickerButton}>
+              <Text style={styles.pickerButtonText}>{formattedEndTime}</Text>
+            </Pressable>
+            {showAndroidEndTimePicker && (
+              <DateTimePicker
+                value={eventEndTime}
+                mode="time"
+                display="default"
+                onChange={onEndTimeChange}
+              />
+            )}
+          </>
+        )}
+      </View>
+
+      {!hasValidTimeRange ? <Text style={styles.errorText}>End time must be after start time.</Text> : null}
+
       <View style={styles.spacer} />
 
       <Button
@@ -137,6 +221,7 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
         onPress={() =>
           navigation.navigate("ChooseLocation", {
             eventName: eventName.trim(),
+            eventDescription: eventDescription.trim() || undefined,
             eventDate: {
               year: eventDate.getFullYear(),
               month: eventDate.getMonth() + 1,
@@ -145,6 +230,10 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
             eventTime: {
               hour: eventTime.getHours(),
               minute: eventTime.getMinutes(),
+            },
+            eventEndTime: {
+              hour: eventEndTime.getHours(),
+              minute: eventEndTime.getMinutes(),
             },
           })
         }
@@ -183,6 +272,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   pickerButtonText: { fontSize: 16 },
+  descriptionInput: {
+    minHeight: 90,
+  },
+  errorText: { marginTop: 10, color: "#b00020", fontSize: 13 },
   spacer: { height: 16 },
 });
 
