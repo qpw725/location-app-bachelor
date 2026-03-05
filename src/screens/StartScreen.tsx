@@ -30,14 +30,6 @@ export default function StartScreen({ navigation }: Props) {
           <Text style={styles.primaryCardTitle}>Create event</Text>
           <Text style={styles.primaryCardText}>Set event details, date, and location.</Text>
         </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.secondaryCard, pressed && styles.pressed]}
-          onPress={() => navigation.navigate("CreateProfile")}
-        >
-          <Text style={styles.secondaryCardTitle}>Create profile</Text>
-          <Text style={styles.secondaryCardText}>Add your details so people can recognize you.</Text>
-        </Pressable>
       </View>
 
       <View style={styles.section}>
@@ -123,15 +115,6 @@ const styles = StyleSheet.create({
   },
   primaryCardTitle: { color: "#ffffff", fontSize: 18, fontWeight: "700", marginBottom: 4 },
   primaryCardText: { color: "#d8e5fb", fontSize: 14, lineHeight: 20 },
-  secondaryCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#d9e2f3",
-  },
-  secondaryCardTitle: { color: "#1a2233", fontSize: 17, fontWeight: "700", marginBottom: 4 },
-  secondaryCardText: { color: "#4f5f78", fontSize: 14, lineHeight: 20 },
   pressed: { opacity: 0.85 },
   statsRow: { flexDirection: "row", gap: 10 },
   statCard: {

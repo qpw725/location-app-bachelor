@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { supabase } from "../supabase";
+import { getSupabaseDebugInfo, supabase, testSupabaseConnection } from "../supabase";
 
 type AuthStackParamList = {
   Login: undefined;
@@ -14,7 +14,9 @@ export default function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [connectionMessage, setConnectionMessage] = useState<string | null>(null);
 
   async function handleLogin() {
     if (!email || !password) {
@@ -24,17 +26,46 @@ export default function LoginScreen({ navigation }: Props) {
 
     setLoading(true);
     setErrorMessage(null);
+    setConnectionMessage(null);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
+    try {
+      const debugInfo = getSupabaseDebugInfo();
+      console.log("[Login] Supabase debug info:", debugInfo);
 
-    if (error) {
-      setErrorMessage(error.message);
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (error) {
+        console.error("[Login] signIn error:", error);
+        setErrorMessage(`${error.message}${error.status ? ` (status ${error.status})` : ""}`);
+      }
+    } catch (error: unknown) {
+      console.error("[Login] unexpected signIn error:", error);
+      setErrorMessage(error instanceof Error ? error.message : "Unexpected network error.");
     }
 
     setLoading(false);
+  }
+
+  async function handleConnectionTest() {
+    setTestingConnection(true);
+    setConnectionMessage(null);
+
+    const debugInfo = getSupabaseDebugInfo();
+    console.log("[Login] Supabase debug info:", debugInfo);
+
+    const result = await testSupabaseConnection();
+    console.log("[Login] Supabase connection test result:", result);
+
+    setConnectionMessage(
+      result.ok
+        ? `Connection OK (HTTP ${result.status})`
+        : `Connection failed (${result.status || "network error"})`
+    );
+
+    setTestingConnection(false);
   }
 
   return (
@@ -62,9 +93,20 @@ export default function LoginScreen({ navigation }: Props) {
       />
 
       {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+      {connectionMessage ? <Text style={styles.info}>{connectionMessage}</Text> : null}
 
       <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]} onPress={handleLogin} disabled={loading}>
         <Text style={styles.primaryButtonText}>{loading ? "Logging in..." : "Login"}</Text>
+      </Pressable>
+
+      <Pressable
+        onPress={handleConnectionTest}
+        disabled={testingConnection}
+        style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+      >
+        <Text style={styles.secondaryButtonText}>
+          {testingConnection ? "Testing connection..." : "Test Supabase connection"}
+        </Text>
       </Pressable>
 
       <Pressable onPress={() => navigation.navigate("Register")} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}>
@@ -94,6 +136,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   error: { color: "#c53535", marginTop: 10, fontSize: 14 },
+  info: { color: "#1f4fa3", marginTop: 10, fontSize: 14 },
   primaryButton: {
     marginTop: 18,
     borderRadius: 12,

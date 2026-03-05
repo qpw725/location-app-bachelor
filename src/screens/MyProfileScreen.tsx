@@ -13,10 +13,23 @@ type Props = CompositeScreenProps<
 
 export default function MyProfileScreen({ navigation }: Props) {
   const [userEmail, setUserEmail] = useState("No email found");
+  const [displayName, setDisplayName] = useState("No name found");
+  const [displayUsername, setDisplayUsername] = useState("No username found");
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      setUserEmail(data.user?.email ?? "No email found");
+      const user = data.user;
+      const metadata = user?.user_metadata as
+        | { first_name?: string; last_name?: string; username?: string }
+        | undefined;
+
+      const firstName = metadata?.first_name?.trim() ?? "";
+      const lastName = metadata?.last_name?.trim() ?? "";
+      const fullName = `${firstName} ${lastName}`.trim();
+
+      setUserEmail(user?.email ?? "No email found");
+      setDisplayName(fullName || "No name found");
+      setDisplayUsername(metadata?.username?.trim() || "No username found");
     });
   }, []);
 
@@ -37,8 +50,8 @@ export default function MyProfileScreen({ navigation }: Props) {
         <Text style={styles.sectionTitle}>Information</Text>
 
         <View style={styles.card}>
-          <Text style={styles.name}>Noe Sorensen</Text>
-          <Text style={styles.username}>noe.sorensen</Text>
+          <Text style={styles.name}>{displayName}</Text>
+          <Text style={styles.username}>{displayUsername}</Text>
 
           <View style={styles.infoRow}>
             <Text style={styles.infoIcon}>@</Text>

@@ -13,7 +13,6 @@ import CreateEventDetailsScreen from "./src/screens/CreateEventDetailsScreen";
 import ChooseLocationScreen from "./src/screens/ChooseLocationScreen";
 import EventOverviewScreen from "./src/screens/EventOverviewScreen";
 import MyProfileScreen from "./src/screens/MyProfileScreen";
-import CreateProfileScreen from "./src/screens/CreateProfileScreen";
 import NotificationSettingsScreen from "./src/screens/NotificationSettingsScreen";
 import AttendingEventsScreen from "./src/screens/AttendingEventsScreen";
 import HostingEventsScreen from "./src/screens/HostingEventsScreen";
@@ -42,7 +41,6 @@ export type EventDate = {
 
 export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList>;
-  CreateProfile: undefined;
   NotificationSettings: undefined;
   AttendingEvents: undefined;
   HostingEvents: undefined;
@@ -128,11 +126,6 @@ export default function App() {
       {session ? (
         <Stack.Navigator initialRouteName="MainTabs">
           <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
-          <Stack.Screen
-            name="CreateProfile"
-            component={CreateProfileScreen}
-            options={{ title: "Create profile", headerBackTitle: "Home" }}
-          />
           <Stack.Screen
             name="NotificationSettings"
             component={NotificationSettingsScreen}
