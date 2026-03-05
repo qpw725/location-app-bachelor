@@ -3,18 +3,35 @@ import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { CompositeScreenProps } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainTabParamList, RootStackParamList } from "../../App";
+import { useEffect, useState } from "react";
+import { supabase } from "../supabase";
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, "Start">,
   NativeStackScreenProps<RootStackParamList>
 >;
 
+
+
 export default function StartScreen({ navigation }: Props) {
+  const [displayUsername, setDisplayUsername] = useState("No username found");
+  
+useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const user = data.user;
+      const metadata = user?.user_metadata as
+        | { username?: string }
+        | undefined;
+
+      setDisplayUsername(metadata?.username?.trim() || "No username found");
+    });
+  }, []);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
         <Text style={styles.eyebrow}>HOME</Text>
-        <Text style={styles.title}>Hi, Benjamin</Text>
+        <Text style={styles.title}>Hi, {displayUsername}</Text>
         <Text style={styles.subtitle}>Plan your next meetup fast.</Text>
         <View style={styles.heroChip}>
           <Text style={styles.heroChipText}>No upcoming events yet</Text>
