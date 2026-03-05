@@ -15,6 +15,7 @@ export default function MyProfileScreen({ navigation }: Props) {
   const [userEmail, setUserEmail] = useState("No email found");
   const [displayName, setDisplayName] = useState("No name found");
   const [displayUsername, setDisplayUsername] = useState("No username found");
+  const [memberSince, setMemberSince] = useState("Unknown");
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -26,10 +27,16 @@ export default function MyProfileScreen({ navigation }: Props) {
       const firstName = metadata?.first_name?.trim() ?? "";
       const lastName = metadata?.last_name?.trim() ?? "";
       const fullName = `${firstName} ${lastName}`.trim();
+      const createdAt = user?.created_at ? new Date(user.created_at) : null;
+      const createdAtLabel =
+        createdAt && !Number.isNaN(createdAt.getTime())
+          ? createdAt.toLocaleDateString([], { month: "short", day: "2-digit", year: "numeric" })
+          : "Unknown";
 
       setUserEmail(user?.email ?? "No email found");
       setDisplayName(fullName || "No name found");
       setDisplayUsername(metadata?.username?.trim() || "No username found");
+      setMemberSince(createdAtLabel);
     });
   }, []);
 
@@ -66,7 +73,7 @@ export default function MyProfileScreen({ navigation }: Props) {
 
           <View style={styles.infoRow}>
             <Text style={styles.infoIcon}>#</Text>
-            <Text style={styles.infoText}>Member since 2026</Text>
+            <Text style={styles.infoText}>Member since {memberSince}</Text>
           </View>
         </View>
       </View>
