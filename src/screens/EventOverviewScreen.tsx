@@ -3,14 +3,15 @@ import { View, Text, StyleSheet, Pressable, TextInput, ScrollView } from "react-
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../App";
 import StepIndicator from "../components/StepIndicator";
+import { supabase } from "../supabase";
 
 type Props = NativeStackScreenProps<RootStackParamList, "EventOverview">;
 
 const categoryOptions = ["Relaxed social", "Games and drinks", "Networking", "Fitness"];
 const frequencyOptions = ["Low", "Medium", "High"] as const;
 
-export default function EventOverviewScreen({ route }: Props) {
-  const { eventName, location, eventTime, eventDate } = route.params;
+export default function EventOverviewScreen({ route, navigation }: Props) {
+  const { eventName, eventDescription, location, eventTime, eventEndTime, eventDate } = route.params;
 
   const [visibility, setVisibility] = useState<"Private" | "Public">("Private");
   const [selectedCategory, setSelectedCategory] = useState(categoryOptions[0]);
@@ -19,6 +20,9 @@ export default function EventOverviewScreen({ route }: Props) {
   const [notificationFrequency, setNotificationFrequency] = useState<(typeof frequencyOptions)[number]>("Medium");
   const [inviteInput, setInviteInput] = useState("");
   const [invitedPeople, setInvitedPeople] = useState<string[]>([]);
+  const [creatingEvent, setCreatingEvent] = useState(false);
+  const [createEventError, setCreateEventError] = useState<string | null>(null);
+  const [createEventSuccess, setCreateEventSuccess] = useState<string | null>(null);
 
   const locationLabel = useMemo(() => {
     const maxLocationLength = 52;
@@ -27,13 +31,21 @@ export default function EventOverviewScreen({ route }: Props) {
       : location.label;
   }, [location.label]);
 
-  const eventTimeLabel = useMemo(
+  const eventStartTimeLabel = useMemo(
     () =>
       new Date(0, 0, 0, eventTime.hour, eventTime.minute).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
       }),
     [eventTime.hour, eventTime.minute]
+  );
+  const eventEndTimeLabel = useMemo(
+    () =>
+      new Date(0, 0, 0, eventEndTime.hour, eventEndTime.minute).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    [eventEndTime.hour, eventEndTime.minute]
   );
 
   const eventDateLabel = useMemo(
@@ -54,6 +66,59 @@ export default function EventOverviewScreen({ route }: Props) {
     setInviteInput("");
   }
 
+  async function handleCreateEvent() {
+    setCreateEventError(null);
+    setCreateEventSuccess(null);
+    setCreatingEvent(true);
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) {
+      setCreateEventError(userError?.message ?? "Could not identify current user.");
+      setCreatingEvent(false);
+      return;
+    }
+
+    const startDate = new Date(
+      eventDate.year,
+      eventDate.month - 1,
+      eventDate.day,
+      eventTime.hour,
+      eventTime.minute,
+      0,
+      0
+    );
+    const endDate = new Date(
+      eventDate.year,
+      eventDate.month - 1,
+      eventDate.day,
+      eventEndTime.hour,
+      eventEndTime.minute,
+      0,
+      0
+    );
+
+    const { error } = await supabase.from("events").insert({
+      creator_id: userData.user.id,
+      title: eventName.trim(),
+      description: eventDescription?.trim() ? eventDescription.trim() : null,
+      location: location.label,
+      start_time: startDate.toISOString(),
+      end_time: endDate.toISOString(),
+      genre: selectedCategory,
+      private: visibility === "Private",
+    });
+
+    if (error) {
+      setCreateEventError(error.message);
+      setCreatingEvent(false);
+      return;
+    }
+
+    setCreateEventSuccess("Event created successfully.");
+    setCreatingEvent(false);
+    navigation.navigate("MainTabs", { screen: "Events" });
+  }
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <StepIndicator step={3} total={3} label="Finalize" />
@@ -62,9 +127,11 @@ export default function EventOverviewScreen({ route }: Props) {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Event summary</Text>
         <Text style={styles.cardText}>Title: {eventName}</Text>
+        {eventDescription?.trim() ? <Text style={styles.cardText}>Description: {eventDescription}</Text> : null}
         <Text style={styles.cardText}>Location: {locationLabel}</Text>
         <Text style={styles.cardText}>Date: {eventDateLabel}</Text>
-        <Text style={styles.cardText}>Time: {eventTimeLabel}</Text>
+        <Text style={styles.cardText}>Start: {eventStartTimeLabel}</Text>
+        <Text style={styles.cardText}>End: {eventEndTimeLabel}</Text>
       </View>
 
       <View style={styles.card}>
@@ -166,8 +233,13 @@ export default function EventOverviewScreen({ route }: Props) {
         )}
       </View>
 
-      <Pressable style={styles.primaryBtn}>
-        <Text style={styles.primaryBtnText}>{visibility === "Public" ? "Publish event" : "Create event"}</Text>
+      {createEventError ? <Text style={styles.errorText}>{createEventError}</Text> : null}
+      {createEventSuccess ? <Text style={styles.successText}>{createEventSuccess}</Text> : null}
+
+      <Pressable style={[styles.primaryBtn, creatingEvent && styles.primaryBtnDisabled]} onPress={handleCreateEvent} disabled={creatingEvent}>
+        <Text style={styles.primaryBtnText}>
+          {creatingEvent ? "Creating..." : visibility === "Public" ? "Publish event" : "Create event"}
+        </Text>
       </Pressable>
     </ScrollView>
   );
@@ -271,5 +343,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#111",
   },
+  primaryBtnDisabled: { backgroundColor: "#777" },
   primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  errorText: { color: "#b00020", marginBottom: 8 },
+  successText: { color: "#2f7d32", marginBottom: 8 },
 });

@@ -47,8 +47,15 @@ export type RootStackParamList = {
   HostingEvents: undefined;
   PastEvents: undefined;
   CreateEventDetails: undefined;
-  ChooseLocation: { eventName: string; eventTime: EventTime; eventDate: EventDate };
-  EventOverview: { eventName: string; location: EventLocation; eventTime: EventTime; eventDate: EventDate };
+  ChooseLocation: { eventName: string; eventDescription?: string; eventTime: EventTime; eventEndTime: EventTime; eventDate: EventDate };
+  EventOverview: {
+    eventName: string;
+    eventDescription?: string;
+    location: EventLocation;
+    eventTime: EventTime;
+    eventEndTime: EventTime;
+    eventDate: EventDate;
+  };
 };
 
 export type MainTabParamList = {

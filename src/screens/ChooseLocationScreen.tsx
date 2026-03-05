@@ -17,7 +17,7 @@ import StepIndicator from "../components/StepIndicator";
 type Props = NativeStackScreenProps<RootStackParamList, "ChooseLocation">;
 
 export default function ChooseLocationScreen({ navigation, route }: Props) {
-  const { eventName, eventTime, eventDate } = route.params;
+  const { eventName, eventDescription, eventTime, eventEndTime, eventDate } = route.params;
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NominatimResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -127,7 +127,7 @@ export default function ChooseLocationScreen({ navigation, route }: Props) {
 
   function goNext() {
     if (!selected) return;
-    navigation.navigate("EventOverview", { eventName, location: selected, eventTime, eventDate });
+    navigation.navigate("EventOverview", { eventName, eventDescription, location: selected, eventTime, eventEndTime, eventDate });
   }
 
   return (
