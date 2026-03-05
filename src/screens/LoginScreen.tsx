@@ -6,6 +6,10 @@ import { getSupabaseDebugInfo, supabase, testSupabaseConnection } from "../supab
 type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
+  RegisterProfile: {
+    email: string;
+    password: string;
+  };
 };
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;

@@ -19,6 +19,7 @@ import HostingEventsScreen from "./src/screens/HostingEventsScreen";
 import PastEventsScreen from "./src/screens/PastEventsScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
+import RegisterProfileScreen from "./src/screens/RegisterProfileScreen";
 import { supabase } from "./src/supabase";
 
 
@@ -60,6 +61,10 @@ export type MainTabParamList = {
 type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
+  RegisterProfile: {
+    email: string;
+    password: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -71,6 +76,7 @@ function AuthScreens() {
     <AuthStack.Navigator>
       <AuthStack.Screen name="Login" component={LoginScreen} options={{ title: "Login" }} />
       <AuthStack.Screen name="Register" component={RegisterScreen} options={{ title: "Register" }} />
+      <AuthStack.Screen name="RegisterProfile" component={RegisterProfileScreen} options={{ title: "Register" }} />
     </AuthStack.Navigator>
   );
 }
