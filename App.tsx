@@ -106,12 +106,32 @@ export default function App() {
   useEffect(() => {
     let isMounted = true;
 
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      if (isMounted) {
+    async function loadSession() {
+      try {
+        const {
+          data: { session: currentSession },
+        } = await supabase.auth.getSession();
+
+        if (!isMounted) {
+          return;
+        }
+
         setSession(currentSession);
-        setIsLoadingSession(false);
+      } catch (error: unknown) {
+        if (!isMounted) {
+          return;
+        }
+
+        console.error("[App] Failed to load auth session:", error);
+        setSession(null);
+      } finally {
+        if (isMounted) {
+          setIsLoadingSession(false);
+        }
       }
-    });
+    }
+
+    loadSession();
 
     const {
       data: { subscription },
