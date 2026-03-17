@@ -12,7 +12,16 @@ import {
   TextInput,
   Platform,
 } from "react-native";
-import { deleteHostedEvent, fetchEventBuckets, type EventItem, updateHostedEvent } from "../data/eventStore";
+import {
+  addHostedEventInvite,
+  deleteHostedEvent,
+  fetchEventBuckets,
+  fetchHostedEventInvitees,
+  removeHostedEventInvite,
+  type EventItem,
+  type HostedEventInvitee,
+  updateHostedEvent,
+} from "../data/eventStore";
 
 type EditDraft = {
   eventId: string;
@@ -34,6 +43,11 @@ export default function HostingEventsScreen() {
   const [eventToEdit, setEventToEdit] = useState<EditDraft | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [editInviteInput, setEditInviteInput] = useState("");
+  const [eventInvitees, setEventInvitees] = useState<HostedEventInvitee[]>([]);
+  const [loadingInvitees, setLoadingInvitees] = useState(false);
+  const [addingInvitee, setAddingInvitee] = useState(false);
+  const [removingInviteeId, setRemovingInviteeId] = useState<string | null>(null);
 
   const loadEvents = useCallback(async () => {
     setError(null);
@@ -109,6 +123,8 @@ export default function HostingEventsScreen() {
 
     setActionError(null);
     setShowDatePicker(false);
+    setEditInviteInput("");
+    setEventInvitees([]);
     setEventToEdit({
       eventId: event.id,
       title: event.title,
@@ -118,7 +134,61 @@ export default function HostingEventsScreen() {
       startAt: new Date(event.startAt),
       endAt: new Date(event.endAt),
     });
+    void loadEventInvitees(event.id);
   }
+
+  const loadEventInvitees = useCallback(async (eventId: string) => {
+    setLoadingInvitees(true);
+    const { data, error: inviteesError } = await fetchHostedEventInvitees(eventId);
+    if (inviteesError) {
+      setActionError(inviteesError);
+      setLoadingInvitees(false);
+      return;
+    }
+    setEventInvitees(data ?? []);
+    setLoadingInvitees(false);
+  }, []);
+
+  const handleAddInvitee = useCallback(async () => {
+    if (!eventToEdit) {
+      return;
+    }
+    setActionError(null);
+    setAddingInvitee(true);
+    const { data, error: addError } = await addHostedEventInvite(eventToEdit.eventId, editInviteInput);
+    if (addError) {
+      setActionError(addError);
+      setAddingInvitee(false);
+      return;
+    }
+    if (data) {
+      setEventInvitees((prev) => {
+        const next = prev.filter((invitee) => invitee.id !== data.id).concat(data);
+        return next.sort((a, b) => a.name.localeCompare(b.name));
+      });
+    }
+    setEditInviteInput("");
+    setAddingInvitee(false);
+  }, [editInviteInput, eventToEdit]);
+
+  const handleRemoveInvitee = useCallback(
+    async (inviteeId: string) => {
+      if (!eventToEdit) {
+        return;
+      }
+      setActionError(null);
+      setRemovingInviteeId(inviteeId);
+      const { error: removeError } = await removeHostedEventInvite(eventToEdit.eventId, inviteeId);
+      if (removeError) {
+        setActionError(removeError);
+        setRemovingInviteeId(null);
+        return;
+      }
+      setEventInvitees((prev) => prev.filter((invitee) => invitee.id !== inviteeId));
+      setRemovingInviteeId(null);
+    },
+    [eventToEdit]
+  );
 
   function onEditDateChange(_event: DateTimePickerEvent, selectedDate?: Date) {
     if (Platform.OS === "android") {
@@ -352,6 +422,60 @@ export default function HostingEventsScreen() {
               ))}
             </View>
 
+            <Text style={styles.fieldLabel}>Manage invitees</Text>
+            <View style={styles.inviteRow}>
+              <TextInput
+                value={editInviteInput}
+                onChangeText={setEditInviteInput}
+                placeholder="Add a friend's username"
+                style={styles.input}
+                autoCorrect={false}
+                autoCapitalize="none"
+              />
+              <Pressable
+                style={[styles.smallPrimaryButton, addingInvitee && styles.secondaryButtonDisabled]}
+                onPress={() => {
+                  void handleAddInvitee();
+                }}
+                disabled={addingInvitee || processingEventId !== null}
+              >
+                <Text style={styles.smallPrimaryButtonText}>{addingInvitee ? "Adding..." : "Add"}</Text>
+              </Pressable>
+            </View>
+
+            {loadingInvitees ? (
+              <View style={styles.inviteStateRow}>
+                <ActivityIndicator size="small" />
+                <Text style={styles.inviteStateText}>Loading invitees...</Text>
+              </View>
+            ) : eventInvitees.length === 0 ? (
+              <Text style={styles.inviteEmptyText}>No one invited yet.</Text>
+            ) : (
+              <View style={styles.inviteeList}>
+                {eventInvitees.map((invitee) => (
+                  <View key={invitee.id} style={styles.inviteeCard}>
+                    <View style={styles.inviteeTextWrap}>
+                      <Text style={styles.inviteeName}>{invitee.name}</Text>
+                      <Text style={styles.inviteeMeta}>
+                        @{invitee.username} · {invitee.status}
+                      </Text>
+                    </View>
+                    <Pressable
+                      style={[styles.removeInviteeButton, removingInviteeId === invitee.id && styles.secondaryButtonDisabled]}
+                      onPress={() => {
+                        void handleRemoveInvitee(invitee.id);
+                      }}
+                      disabled={removingInviteeId !== null || processingEventId !== null}
+                    >
+                      <Text style={styles.removeInviteeButtonText}>
+                        {removingInviteeId === invitee.id ? "Removing..." : "Remove"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )}
+
             {actionError ? <Text style={styles.modalError}>{actionError}</Text> : null}
             <View style={styles.modalActions}>
               <Pressable
@@ -360,6 +484,8 @@ export default function HostingEventsScreen() {
                   if (processingEventId === null) {
                     setEventToEdit(null);
                     setShowDatePicker(false);
+                    setEditInviteInput("");
+                    setEventInvitees([]);
                     setActionError(null);
                   }
                 }}
@@ -513,6 +639,7 @@ const styles = StyleSheet.create({
     color: "#1a2233",
     backgroundColor: "#ffffff",
   },
+  inviteRow: { flexDirection: "row", gap: 8, alignItems: "center", marginTop: 2 },
   inputButton: {
     borderWidth: 1,
     borderColor: "#d8e1f2",
@@ -545,6 +672,42 @@ const styles = StyleSheet.create({
   },
   visibilityOptionText: { fontSize: 12, color: "#4c5e7b", fontWeight: "700" },
   visibilityOptionTextActive: { color: "#ffffff" },
+  smallPrimaryButton: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#1f4fa3",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "#1f4fa3",
+  },
+  smallPrimaryButtonText: { color: "#ffffff", fontWeight: "700", fontSize: 13 },
+  inviteStateRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
+  inviteStateText: { color: "#5d6a80", fontSize: 13 },
+  inviteEmptyText: { color: "#6b7a90", fontSize: 13, marginTop: 10 },
+  inviteeList: { marginTop: 10, gap: 8 },
+  inviteeCard: {
+    borderWidth: 1,
+    borderColor: "#e4eaf5",
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    backgroundColor: "#f9fbff",
+  },
+  inviteeTextWrap: { flex: 1 },
+  inviteeName: { fontSize: 14, fontWeight: "700", color: "#1a2233" },
+  inviteeMeta: { fontSize: 12, color: "#5d6a80", marginTop: 2 },
+  removeInviteeButton: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#efc7c7",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    backgroundColor: "#fff1f1",
+  },
+  removeInviteeButtonText: { color: "#a23d3d", fontSize: 12, fontWeight: "700" },
   modalError: { marginTop: 10, color: "#a23d3d", fontSize: 13, fontWeight: "600" },
   modalActions: {
     flexDirection: "row",

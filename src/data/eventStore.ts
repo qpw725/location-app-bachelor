@@ -61,6 +61,13 @@ export type HomeActivityItem = {
   meta: string;
 };
 
+export type HostedEventInvitee = {
+  id: string;
+  username: string;
+  name: string;
+  status: string;
+};
+
 function formatHostName(profile: ProfileRow | undefined, creatorId: string | null, activeUserId: string | null) {
   if (creatorId && activeUserId && creatorId === activeUserId) {
     return "You";
@@ -560,6 +567,168 @@ export async function updateHostedEvent(input: {
 
   if (!data) {
     return { error: "Event not found or you do not have permission to edit it." };
+  }
+
+  return { error: null };
+}
+
+export async function fetchHostedEventInvitees(eventId: string): Promise<{ data: HostedEventInvitee[] | null; error: string | null }> {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    return { data: null, error: authError.message };
+  }
+
+  const userId = authData.user?.id;
+  if (!userId) {
+    return { data: null, error: "Could not identify current user." };
+  }
+
+  const { data: inviteRows, error: inviteError } = await supabase
+    .from("event_invites")
+    .select("invitee_id, status")
+    .eq("event_id", eventId);
+
+  if (inviteError) {
+    return { data: null, error: inviteError.message };
+  }
+
+  const inviteeIds = ((inviteRows ?? []) as Array<{ invitee_id: string; status: string | null }>).map((row) => row.invitee_id);
+  if (inviteeIds.length === 0) {
+    return { data: [], error: null };
+  }
+
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select("id, username, first_name, last_name")
+    .in("id", inviteeIds);
+
+  if (profilesError) {
+    return { data: null, error: profilesError.message };
+  }
+
+  const profileMap = new Map<string, ProfileRow>();
+  for (const profile of (profiles ?? []) as ProfileRow[]) {
+    profileMap.set(profile.id, profile);
+  }
+
+  return {
+    data: ((inviteRows ?? []) as Array<{ invitee_id: string; status: string | null }>)
+      .map((row) => {
+        const profile = profileMap.get(row.invitee_id);
+        if (!profile) {
+          return null;
+        }
+        return {
+          id: profile.id,
+          username: profile.username?.trim() ?? "",
+          name: fullNameFromProfile(profile),
+          status: row.status?.trim() ?? "pending",
+        };
+      })
+      .filter((row): row is HostedEventInvitee => row !== null)
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    error: null,
+  };
+}
+
+export async function addHostedEventInvite(eventId: string, usernameInput: string): Promise<{ data: HostedEventInvitee | null; error: string | null }> {
+  const username = usernameInput.trim();
+  if (!username) {
+    return { data: null, error: "Enter a username first." };
+  }
+
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    return { data: null, error: authError.message };
+  }
+
+  const userId = authData.user?.id;
+  if (!userId) {
+    return { data: null, error: "Could not identify current user." };
+  }
+
+  const { data: friendProfile, error: friendLookupError } = await supabase
+    .from("profiles")
+    .select("id, username, first_name, last_name")
+    .ilike("username", username)
+    .limit(1)
+    .maybeSingle();
+
+  if (friendLookupError) {
+    return { data: null, error: friendLookupError.message };
+  }
+
+  if (!friendProfile || !friendProfile.username) {
+    return { data: null, error: "Username is nonexistent." };
+  }
+
+  if (friendProfile.id === userId) {
+    return { data: null, error: "You cannot invite yourself." };
+  }
+
+  const [userA, userB] = [userId, friendProfile.id].sort();
+  const { data: friendship, error: friendshipError } = await supabase
+    .from("friendships")
+    .select("user_a")
+    .eq("user_a", userA)
+    .eq("user_b", userB)
+    .maybeSingle();
+
+  if (friendshipError) {
+    return { data: null, error: friendshipError.message };
+  }
+
+  if (!friendship) {
+    return { data: null, error: "You can only invite users who are already your friends." };
+  }
+
+  const { error: inviteInsertError } = await supabase
+    .from("event_invites")
+    .upsert(
+      [{ event_id: eventId, invitee_id: friendProfile.id, status: "pending" }],
+      { onConflict: "event_id,invitee_id" }
+    );
+
+  if (inviteInsertError) {
+    return { data: null, error: inviteInsertError.message };
+  }
+
+  return {
+    data: {
+      id: friendProfile.id,
+      username: friendProfile.username.trim(),
+      name: fullNameFromProfile(friendProfile),
+      status: "pending",
+    },
+    error: null,
+  };
+}
+
+export async function removeHostedEventInvite(eventId: string, inviteeId: string): Promise<{ error: string | null }> {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    return { error: authError.message };
+  }
+
+  const userId = authData.user?.id;
+  if (!userId) {
+    return { error: "Could not identify current user." };
+  }
+
+  const { data, error } = await supabase
+    .from("event_invites")
+    .delete()
+    .eq("event_id", eventId)
+    .eq("invitee_id", inviteeId)
+    .select("invitee_id")
+    .maybeSingle();
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  if (!data) {
+    return { error: "Invite not found or you do not have permission to remove this user." };
   }
 
   return { error: null };
