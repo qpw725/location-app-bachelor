@@ -19,6 +19,13 @@ type ProfileRow = {
   last_name: string | null;
 };
 
+function fullNameFromProfile(profile: ProfileRow) {
+  const first = profile.first_name?.trim() ?? "";
+  const last = profile.last_name?.trim() ?? "";
+  const fullName = `${first} ${last}`.trim();
+  return fullName || profile.username?.trim() || "Unknown user";
+}
+
 export type EventItem = {
   id: string;
   title: string;
@@ -44,6 +51,14 @@ export type HomeOverview = {
   upcomingCount: number;
   pendingInviteCount: number;
   hostingCount: number;
+};
+
+export type HomeActivityItem = {
+  id: string;
+  type: "event_invite" | "friend_request";
+  title: string;
+  subtitle: string;
+  meta: string;
 };
 
 function formatHostName(profile: ProfileRow | undefined, creatorId: string | null, activeUserId: string | null) {
@@ -121,7 +136,7 @@ export async function fetchEventBuckets(): Promise<{ data: EventBuckets | null; 
     return { data: null, error: publicError.message };
   }
 
-  const invitedEventIds = new Set<string>();
+  const acceptedInviteEventIds = new Set<string>();
   if (userId) {
     const { data: inviteRows, error: inviteError } = await supabase
       .from("event_invites")
@@ -138,19 +153,19 @@ export async function fetchEventBuckets(): Promise<{ data: EventBuckets | null; 
       if (!eventId || !statusValue) {
         continue;
       }
-      if (!["accepted", "pending"].includes(String(statusValue).toLowerCase())) {
+      if (String(statusValue).toLowerCase() !== "accepted") {
         continue;
       }
-      invitedEventIds.add(String(eventId));
+      acceptedInviteEventIds.add(String(eventId));
     }
   }
 
   const invitedRows: DbEventRow[] = [];
-  if (invitedEventIds.size > 0) {
+  if (acceptedInviteEventIds.size > 0) {
     const { data, error } = await supabase
       .from("events")
       .select("id, title, description, location, start_time, end_time, genre, private, creator_id")
-      .in("id", Array.from(invitedEventIds))
+      .in("id", Array.from(acceptedInviteEventIds))
       .order("start_time", { ascending: true });
 
     if (error) {
@@ -313,6 +328,128 @@ export async function fetchHomeOverview(): Promise<{ data: HomeOverview | null; 
       pendingInviteCount: upcomingPendingIds.size,
       hostingCount: hostingEventIds.size,
     },
+    error: null,
+  };
+}
+
+export async function fetchHomeActivity(): Promise<{ data: HomeActivityItem[] | null; error: string | null }> {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    return { data: null, error: authError.message };
+  }
+
+  const userId = authData.user?.id ?? null;
+  if (!userId) {
+    return { data: [], error: null };
+  }
+
+  const { data: pendingFriendRows, error: friendError } = await supabase
+    .from("friend_requests")
+    .select("id, sender_id")
+    .eq("receiver_id", userId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(3);
+
+  if (friendError) {
+    return { data: null, error: friendError.message };
+  }
+
+  const senderIds = ((pendingFriendRows ?? []) as Array<{ id: string; sender_id: string }>).map((row) => row.sender_id);
+  const senderMap = new Map<string, ProfileRow>();
+
+  if (senderIds.length > 0) {
+    const { data: senderProfiles, error: senderProfilesError } = await supabase
+      .from("profiles")
+      .select("id, username, first_name, last_name")
+      .in("id", senderIds);
+
+    if (senderProfilesError) {
+      return { data: null, error: senderProfilesError.message };
+    }
+
+    for (const profile of (senderProfiles ?? []) as ProfileRow[]) {
+      senderMap.set(profile.id, profile);
+    }
+  }
+
+  const friendItems: HomeActivityItem[] = ((pendingFriendRows ?? []) as Array<{ id: string; sender_id: string }>).map((row) => {
+    const profile = senderMap.get(row.sender_id);
+    return {
+      id: `friend:${row.id}`,
+      type: "friend_request",
+      title: profile ? fullNameFromProfile(profile) : "Unknown user",
+      subtitle: "Sent you a friend request",
+      meta: profile?.username?.trim() ? `@${profile.username.trim()}` : "Friend request",
+    };
+  });
+
+  const { data: pendingEventInviteRows, error: eventInviteError } = await supabase
+    .from("event_invites")
+    .select("event_id, invitee_id")
+    .eq("invitee_id", userId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(3);
+
+  if (eventInviteError) {
+    return { data: null, error: eventInviteError.message };
+  }
+
+  const pendingEventIds = ((pendingEventInviteRows ?? []) as Array<{ event_id: string; invitee_id: string }>).map((row) => row.event_id);
+  const eventMap = new Map<string, DbEventRow>();
+  const hostMap = new Map<string, ProfileRow>();
+
+  if (pendingEventIds.length > 0) {
+    const { data: eventRows, error: eventRowsError } = await supabase
+      .from("events")
+      .select("id, title, description, location, start_time, end_time, genre, private, creator_id")
+      .in("id", pendingEventIds);
+
+    if (eventRowsError) {
+      return { data: null, error: eventRowsError.message };
+    }
+
+    for (const row of (eventRows ?? []) as DbEventRow[]) {
+      eventMap.set(row.id, row);
+    }
+
+    const creatorIds = Array.from(new Set(((eventRows ?? []) as DbEventRow[]).map((row) => row.creator_id).filter(Boolean))) as string[];
+    if (creatorIds.length > 0) {
+      const { data: hostProfiles, error: hostProfilesError } = await supabase
+        .from("profiles")
+        .select("id, username, first_name, last_name")
+        .in("id", creatorIds);
+
+      if (hostProfilesError) {
+        return { data: null, error: hostProfilesError.message };
+      }
+
+      for (const profile of (hostProfiles ?? []) as ProfileRow[]) {
+        hostMap.set(profile.id, profile);
+      }
+    }
+  }
+
+  const eventItems: HomeActivityItem[] = ((pendingEventInviteRows ?? []) as Array<{ event_id: string; invitee_id: string }>)
+    .map((row) => {
+      const event = eventMap.get(row.event_id);
+      if (!event) {
+        return null;
+      }
+      const hostProfile = event.creator_id ? hostMap.get(event.creator_id) : undefined;
+      return {
+        id: `event:${row.event_id}:${row.invitee_id}`,
+        type: "event_invite",
+        title: event.title?.trim() || "Untitled event",
+        subtitle: "Sent you an event invite",
+        meta: hostProfile ? fullNameFromProfile(hostProfile) : "Unknown host",
+      };
+    })
+    .filter((item): item is HomeActivityItem => item !== null);
+
+  return {
+    data: [...eventItems, ...friendItems].slice(0, 4),
     error: null,
   };
 }

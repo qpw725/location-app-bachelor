@@ -8,6 +8,11 @@ import { supabase } from "../supabase";
 
 type Props = NativeStackScreenProps<RootStackParamList, "EventOverview">;
 
+type InvitedFriend = {
+  id: string;
+  username: string;
+};
+
 const categoryOptions = [
   "Sports",
   "Fitness",
@@ -35,7 +40,10 @@ export default function EventOverviewScreen({ route, navigation }: Props) {
   const [notifyArrivalUpdates, setNotifyArrivalUpdates] = useState(true);
   const [notificationFrequency, setNotificationFrequency] = useState<(typeof frequencyOptions)[number]>("Medium");
   const [inviteInput, setInviteInput] = useState("");
-  const [invitedPeople, setInvitedPeople] = useState<string[]>([]);
+  const [invitedPeople, setInvitedPeople] = useState<InvitedFriend[]>([]);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+  const [addingInvitee, setAddingInvitee] = useState(false);
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [createEventError, setCreateEventError] = useState<string | null>(null);
   const [createEventSuccess, setCreateEventSuccess] = useState<string | null>(null);
@@ -75,11 +83,82 @@ export default function EventOverviewScreen({ route, navigation }: Props) {
     [eventDate.day, eventDate.month, eventDate.year]
   );
 
-  function addInvitee() {
+  async function addInvitee() {
     const trimmed = inviteInput.trim();
-    if (!trimmed) return;
-    setInvitedPeople((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
+    if (!trimmed) {
+      setInviteError("Enter a username first.");
+      setInviteSuccess(null);
+      return;
+    }
+
+    setInviteError(null);
+    setInviteSuccess(null);
+    setAddingInvitee(true);
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) {
+      setInviteError(userError?.message ?? "Could not identify current user.");
+      setAddingInvitee(false);
+      return;
+    }
+
+    const activeUserId = userData.user.id;
+
+    const { data: friendProfile, error: friendLookupError } = await supabase
+      .from("profiles")
+      .select("id, username")
+      .ilike("username", trimmed)
+      .limit(1)
+      .maybeSingle();
+
+    if (friendLookupError) {
+      setInviteError(friendLookupError.message);
+      setAddingInvitee(false);
+      return;
+    }
+
+    if (!friendProfile || !friendProfile.username) {
+      setInviteError("Username is nonexistent.");
+      setAddingInvitee(false);
+      return;
+    }
+
+    if (friendProfile.id === activeUserId) {
+      setInviteError("You cannot invite yourself.");
+      setAddingInvitee(false);
+      return;
+    }
+
+    const [userA, userB] = [activeUserId, friendProfile.id].sort();
+    const { data: existingFriendship, error: friendshipError } = await supabase
+      .from("friendships")
+      .select("user_a")
+      .eq("user_a", userA)
+      .eq("user_b", userB)
+      .maybeSingle();
+
+    if (friendshipError) {
+      setInviteError(friendshipError.message);
+      setAddingInvitee(false);
+      return;
+    }
+
+    if (!existingFriendship) {
+      setInviteError("You can only invite users who are already your friends.");
+      setAddingInvitee(false);
+      return;
+    }
+
+    const username = friendProfile.username.trim();
+    setInvitedPeople((prev) => {
+      if (prev.some((person) => person.id === friendProfile.id)) {
+        return prev;
+      }
+      return [...prev, { id: friendProfile.id, username }];
+    });
     setInviteInput("");
+    setInviteSuccess(`@${username} added to invite list.`);
+    setAddingInvitee(false);
   }
 
   async function handleCreateEvent() {
@@ -146,23 +225,8 @@ export default function EventOverviewScreen({ route, navigation }: Props) {
       return;
     }
 
-    const normalizedInvitees = Array.from(
-      new Set(invitedPeople.map((person) => person.trim()).filter((person) => person.length > 0))
-    );
-
-    if (normalizedInvitees.length > 0) {
-      const { data: inviteeProfiles, error: inviteeLookupError } = await supabase
-        .from("profiles")
-        .select("id, username")
-        .in("username", normalizedInvitees);
-
-      if (inviteeLookupError) {
-        setCreateEventError(inviteeLookupError.message);
-        setCreatingEvent(false);
-        return;
-      }
-
-      const inviteRows = (inviteeProfiles ?? [])
+    if (invitedPeople.length > 0) {
+      const inviteRows = invitedPeople
         .filter((profile) => profile.id !== userData.user.id)
         .map((profile) => ({
           event_id: createdEvent.id,
@@ -284,23 +348,31 @@ export default function EventOverviewScreen({ route, navigation }: Props) {
           <TextInput
             value={inviteInput}
             onChangeText={setInviteInput}
-            placeholder="Add username or email"
+            placeholder="Add a friend's username"
             style={styles.input}
             autoCorrect={false}
             autoCapitalize="none"
           />
-          <Pressable style={styles.addBtn} onPress={addInvitee}>
-            <Text style={styles.addBtnText}>Add</Text>
+          <Pressable style={styles.addBtn} onPress={() => void addInvitee()} disabled={addingInvitee}>
+            <Text style={styles.addBtnText}>{addingInvitee ? "Checking..." : "Add"}</Text>
           </Pressable>
         </View>
+        {inviteError ? <Text style={styles.errorText}>{inviteError}</Text> : null}
+        {inviteSuccess ? <Text style={styles.successText}>{inviteSuccess}</Text> : null}
 
         {invitedPeople.length === 0 ? (
           <Text style={styles.placeholderText}>No people added yet.</Text>
         ) : (
           <View style={styles.chipsWrap}>
             {invitedPeople.map((person) => (
-              <View key={person} style={styles.personChip}>
-                <Text style={styles.personChipText}>{person}</Text>
+              <View key={person.id} style={styles.personChip}>
+                <Text style={styles.personChipText}>@{person.username}</Text>
+                <Pressable
+                  onPress={() => setInvitedPeople((prev) => prev.filter((invitee) => invitee.id !== person.id))}
+                  style={styles.removeChipButton}
+                >
+                  <Text style={styles.removeChipButtonText}>x</Text>
+                </Pressable>
               </View>
             ))}
           </View>
@@ -408,8 +480,20 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   personChipText: { color: "#33415c", fontSize: 12, fontWeight: "600" },
+  removeChipButton: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#d4deef",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  removeChipButtonText: { color: "#33415c", fontSize: 11, fontWeight: "700" },
   primaryBtn: {
     marginTop: 6,
     paddingVertical: 14,

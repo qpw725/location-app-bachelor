@@ -5,7 +5,7 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainTabParamList, RootStackParamList } from "../../App";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../supabase";
-import { fetchHomeOverview } from "../data/eventStore";
+import { fetchHomeActivity, fetchHomeOverview, type HomeActivityItem } from "../data/eventStore";
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, "Start">,
@@ -19,6 +19,7 @@ export default function StartScreen({ navigation }: Props) {
   const [upcomingCount, setUpcomingCount] = useState(0);
   const [pendingInviteCount, setPendingInviteCount] = useState(0);
   const [hostingCount, setHostingCount] = useState(0);
+  const [activityItems, setActivityItems] = useState<HomeActivityItem[]>([]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -32,13 +33,18 @@ export default function StartScreen({ navigation }: Props) {
   }, []);
 
   const loadOverview = useCallback(async () => {
-    const { data } = await fetchHomeOverview();
-    if (!data) {
+    const [{ data: overviewData }, { data: activityData }] = await Promise.all([
+      fetchHomeOverview(),
+      fetchHomeActivity(),
+    ]);
+
+    if (!overviewData) {
       return;
     }
-    setUpcomingCount(data.upcomingCount);
-    setPendingInviteCount(data.pendingInviteCount);
-    setHostingCount(data.hostingCount);
+    setUpcomingCount(overviewData.upcomingCount);
+    setPendingInviteCount(overviewData.pendingInviteCount);
+    setHostingCount(overviewData.hostingCount);
+    setActivityItems(activityData ?? []);
   }, []);
 
   useEffect(() => {
@@ -111,10 +117,29 @@ export default function StartScreen({ navigation }: Props) {
           </Pressable>
         </View>
 
-        <View style={styles.activityCard}>
-          <Text style={styles.activityTitle}>No recent activity yet</Text>
-          <Text style={styles.activityText}>New events and invites will appear here.</Text>
-        </View>
+        {activityItems.length === 0 ? (
+          <View style={styles.activityCard}>
+            <Text style={styles.activityTitle}>No unanswered invites right now</Text>
+            <Text style={styles.activityText}>New friend requests and event invites will appear here.</Text>
+          </View>
+        ) : (
+          activityItems.map((item) => (
+            <Pressable
+              key={item.id}
+              onPress={() => navigation.navigate("Inbox")}
+              style={({ pressed }) => [styles.activityCard, pressed && styles.pressed]}
+            >
+              <View style={styles.activityHeader}>
+                <Text style={styles.activityBadge}>
+                  {item.type === "event_invite" ? "Event invite" : "Friend request"}
+                </Text>
+              </View>
+              <Text style={styles.activityTitle}>{item.title}</Text>
+              <Text style={styles.activityText}>{item.subtitle}</Text>
+              <Text style={styles.activityMeta}>{item.meta}</Text>
+            </Pressable>
+          ))
+        )}
       </View>
     </ScrollView>
   );
@@ -182,7 +207,21 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: "#e4eaf5",
+    marginBottom: 10,
+  },
+  activityHeader: { marginBottom: 8 },
+  activityBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "#eef3fb",
+    color: "#35527f",
+    borderRadius: 999,
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 11,
+    fontWeight: "700",
   },
   activityTitle: { color: "#1a2233", fontSize: 15, fontWeight: "700", marginBottom: 4 },
   activityText: { color: "#5d6a80", fontSize: 14 },
+  activityMeta: { color: "#3f4e68", fontSize: 12, fontWeight: "600", marginTop: 8 },
 });

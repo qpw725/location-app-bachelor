@@ -6,6 +6,7 @@ type InboxItemStatus = "pending" | "accepted" | "declined";
 
 type EventInviteItem = {
   id: string;
+  eventId: string;
   title: string;
   when: string;
   where: string;
@@ -49,11 +50,41 @@ type FriendshipRow = {
   user_b: string;
 };
 
+type EventInviteRow = {
+  event_id: string;
+  invitee_id: string;
+  status: InboxItemStatus;
+};
+
+type EventRow = {
+  id: string;
+  title: string | null;
+  location: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  creator_id: string | null;
+};
+
 function fullNameFromProfile(profile: ProfileRow) {
   const first = profile.first_name?.trim() ?? "";
   const last = profile.last_name?.trim() ?? "";
   const fullName = `${first} ${last}`.trim();
   return fullName || profile.username?.trim() || "Unknown user";
+}
+
+function formatEventTime(startIso: string | null, endIso: string | null) {
+  if (!startIso) {
+    return "Time not set";
+  }
+  const start = new Date(startIso);
+  const end = endIso ? new Date(endIso) : null;
+  const dateLabel = start.toLocaleDateString([], { weekday: "short", day: "2-digit", month: "short" });
+  const startLabel = start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (!end) {
+    return `${dateLabel} at ${startLabel}`;
+  }
+  const endLabel = end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return `${dateLabel} ${startLabel} - ${endLabel}`;
 }
 
 export default function InboxScreen() {
@@ -72,10 +103,6 @@ export default function InboxScreen() {
 
   const pendingEventInvites = useMemo(
     () => eventInvites.filter((invite) => invite.status === "pending"),
-    [eventInvites]
-  );
-  const handledEventInvites = useMemo(
-    () => eventInvites.filter((invite) => invite.status !== "pending"),
     [eventInvites]
   );
   const pendingFriendRequests = useMemo(
@@ -140,6 +167,7 @@ export default function InboxScreen() {
       setLoadingSocialData(true);
     }
     setErrorMessage(null);
+    setSuccessMessage(null);
 
     const { data: requestRows, error: requestsError } = await supabase
       .from("friend_requests")
@@ -191,6 +219,85 @@ export default function InboxScreen() {
           status: request.status,
         };
       })
+    );
+
+    const { data: eventInviteRows, error: eventInvitesError } = await supabase
+      .from("event_invites")
+      .select("event_id, invitee_id, status")
+      .eq("invitee_id", activeUserId)
+      .order("created_at", { ascending: false });
+
+    if (eventInvitesError) {
+      setErrorMessage(eventInvitesError.message);
+      if (!silent) {
+        setLoadingSocialData(false);
+      }
+      return;
+    }
+
+    const eventIds = ((eventInviteRows ?? []) as EventInviteRow[]).map((invite) => invite.event_id);
+    const eventMap = new Map<string, EventRow>();
+    const eventHostMap = new Map<string, ProfileRow>();
+
+    if (eventIds.length > 0) {
+      const { data: eventRows, error: eventsError } = await supabase
+        .from("events")
+        .select("id, title, location, start_time, end_time, creator_id")
+        .in("id", eventIds);
+
+      if (eventsError) {
+        setErrorMessage(eventsError.message);
+        if (!silent) {
+          setLoadingSocialData(false);
+        }
+        return;
+      }
+
+      for (const event of (eventRows ?? []) as EventRow[]) {
+        eventMap.set(event.id, event);
+      }
+
+      const creatorIds = Array.from(new Set(((eventRows ?? []) as EventRow[]).map((event) => event.creator_id).filter(Boolean))) as string[];
+      if (creatorIds.length > 0) {
+        const { data: hostProfiles, error: hostProfilesError } = await supabase
+          .from("profiles")
+          .select("id, username, first_name, last_name")
+          .in("id", creatorIds);
+
+        if (hostProfilesError) {
+          setErrorMessage(hostProfilesError.message);
+          if (!silent) {
+            setLoadingSocialData(false);
+          }
+          return;
+        }
+
+        for (const profile of (hostProfiles ?? []) as ProfileRow[]) {
+          eventHostMap.set(profile.id, profile);
+        }
+      }
+    }
+
+    setEventInvites(
+      ((eventInviteRows ?? []) as EventInviteRow[])
+        .map((invite) => {
+          const event = eventMap.get(invite.event_id);
+          if (!event) {
+            return null;
+          }
+
+          const hostProfile = event.creator_id ? eventHostMap.get(event.creator_id) : undefined;
+          return {
+            id: `${invite.event_id}:${invite.invitee_id}`,
+            eventId: invite.event_id,
+            title: event.title?.trim() || "Untitled event",
+            when: formatEventTime(event.start_time, event.end_time),
+            where: event.location?.trim() || "Location not set",
+            from: hostProfile ? fullNameFromProfile(hostProfile) : "Unknown host",
+            status: invite.status,
+          };
+        })
+        .filter((invite): invite is EventInviteItem => invite !== null)
     );
 
     const { data: friendshipRows, error: friendshipsError } = await supabase
@@ -295,8 +402,29 @@ export default function InboxScreen() {
     return () => clearInterval(intervalId);
   }, [loadSocialData, userId]);
 
-  function updateEventInviteStatus(id: string, status: Exclude<InboxItemStatus, "pending">) {
-    setEventInvites((prev) => prev.map((invite) => (invite.id === id ? { ...invite, status } : invite)));
+  async function updateEventInviteStatus(eventId: string, status: Exclude<InboxItemStatus, "pending">) {
+    if (!userId) {
+      setErrorMessage("You must be logged in to respond to invites.");
+      return;
+    }
+
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const { error } = await supabase
+      .from("event_invites")
+      .update({ status })
+      .eq("event_id", eventId)
+      .eq("invitee_id", userId)
+      .eq("status", "pending");
+
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    setSuccessMessage(status === "accepted" ? "Event invite accepted." : "Event invite declined.");
+    await loadSocialData(userId);
   }
 
   async function updateFriendRequestStatus(id: string, status: Exclude<InboxItemStatus, "pending">) {
@@ -544,13 +672,13 @@ export default function InboxScreen() {
               <Text style={styles.inviteHost}>{invite.from}</Text>
               <View style={styles.actionRow}>
                 <Pressable
-                  onPress={() => updateEventInviteStatus(invite.id, "accepted")}
+                  onPress={() => void updateEventInviteStatus(invite.eventId, "accepted")}
                   style={({ pressed }) => [styles.primaryAction, pressed && styles.pressed]}
                 >
                   <Text style={styles.primaryActionText}>Accept</Text>
                 </Pressable>
                 <Pressable
-                  onPress={() => updateEventInviteStatus(invite.id, "declined")}
+                  onPress={() => void updateEventInviteStatus(invite.eventId, "declined")}
                   style={({ pressed }) => [styles.secondaryAction, pressed && styles.pressed]}
                 >
                   <Text style={styles.secondaryActionText}>Decline</Text>
@@ -652,20 +780,6 @@ export default function InboxScreen() {
           ))
         )}
       </View>
-
-      {handledEventInvites.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recently Handled</Text>
-          {handledEventInvites.map((invite) => (
-            <View key={invite.id} style={styles.historyRow}>
-              <Text style={styles.historyTitle}>{invite.title}</Text>
-              <Text style={[styles.historyBadge, invite.status === "accepted" ? styles.accepted : styles.declined]}>
-                {invite.status === "accepted" ? "Accepted" : "Declined"}
-              </Text>
-            </View>
-          ))}
-        </View>
-      )}
 
       <Modal
         visible={selectedFriend !== null}
@@ -836,29 +950,6 @@ const styles = StyleSheet.create({
   friendTextWrap: { flex: 1 },
   friendUsername: { fontSize: 12, color: "#5d6a80", marginTop: 2 },
   friendArrow: { fontSize: 22, color: "#1a2233", marginLeft: 8 },
-  historyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderRadius: 12,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#e4eaf5",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 8,
-  },
-  historyTitle: { fontSize: 14, color: "#1a2233", fontWeight: "600", flex: 1, paddingRight: 8 },
-  historyBadge: {
-    fontSize: 11,
-    fontWeight: "700",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-    overflow: "hidden",
-  },
-  accepted: { color: "#2f7d32", backgroundColor: "#ecf7ee" },
-  declined: { color: "#a23d3d", backgroundColor: "#fcecec" },
   emptyCard: {
     backgroundColor: "#ffffff",
     borderRadius: 14,
