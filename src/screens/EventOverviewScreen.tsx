@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { View, Text, StyleSheet, Pressable, TextInput, ScrollView } from "react-native";
+import { CommonActions } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../App";
 import StepIndicator from "../components/StepIndicator";
@@ -7,7 +8,22 @@ import { supabase } from "../supabase";
 
 type Props = NativeStackScreenProps<RootStackParamList, "EventOverview">;
 
-const categoryOptions = ["Relaxed social", "Games and drinks", "Networking", "Fitness"];
+const categoryOptions = [
+  "Sports",
+  "Fitness",
+  "Running",
+  "Social",
+  "Party",
+  "Food & Drinks",
+  "Celebration",
+  "Study / Work",
+  "Outdoor",
+  "Games",
+  "Wellness",
+  "Travel",
+  "Culture",
+  "Other",
+];
 const frequencyOptions = ["Low", "Medium", "High"] as const;
 
 export default function EventOverviewScreen({ route, navigation }: Props) {
@@ -97,7 +113,21 @@ export default function EventOverviewScreen({ route, navigation }: Props) {
       0
     );
 
-    const { error } = await supabase.from("events").insert({
+    if (startDate.getTime() <= Date.now()) {
+      setCreateEventError("Start time must be in the future.");
+      setCreatingEvent(false);
+      return;
+    }
+
+    if (endDate.getTime() <= startDate.getTime()) {
+      setCreateEventError("End time must be after start time.");
+      setCreatingEvent(false);
+      return;
+    }
+
+    const { data: createdEvent, error } = await supabase
+      .from("events")
+      .insert({
       creator_id: userData.user.id,
       title: eventName.trim(),
       description: eventDescription?.trim() ? eventDescription.trim() : null,
@@ -106,7 +136,9 @@ export default function EventOverviewScreen({ route, navigation }: Props) {
       end_time: endDate.toISOString(),
       genre: selectedCategory,
       private: visibility === "Private",
-    });
+      })
+      .select("id")
+      .single();
 
     if (error) {
       setCreateEventError(error.message);
@@ -114,9 +146,51 @@ export default function EventOverviewScreen({ route, navigation }: Props) {
       return;
     }
 
+    const normalizedInvitees = Array.from(
+      new Set(invitedPeople.map((person) => person.trim()).filter((person) => person.length > 0))
+    );
+
+    if (normalizedInvitees.length > 0) {
+      const { data: inviteeProfiles, error: inviteeLookupError } = await supabase
+        .from("profiles")
+        .select("id, username")
+        .in("username", normalizedInvitees);
+
+      if (inviteeLookupError) {
+        setCreateEventError(inviteeLookupError.message);
+        setCreatingEvent(false);
+        return;
+      }
+
+      const inviteRows = (inviteeProfiles ?? [])
+        .filter((profile) => profile.id !== userData.user.id)
+        .map((profile) => ({
+          event_id: createdEvent.id,
+          invitee_id: profile.id,
+          status: "pending",
+        }));
+
+      if (inviteRows.length > 0) {
+        const { error: inviteInsertError } = await supabase
+          .from("event_invites")
+          .upsert(inviteRows, { onConflict: "event_id,invitee_id" });
+
+        if (inviteInsertError) {
+          setCreateEventError(inviteInsertError.message);
+          setCreatingEvent(false);
+          return;
+        }
+      }
+    }
+
     setCreateEventSuccess("Event created successfully.");
     setCreatingEvent(false);
-    navigation.navigate("MainTabs", { screen: "Events" });
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: "MainTabs", params: { screen: "Events" } }],
+      })
+    );
   }
 
   return (

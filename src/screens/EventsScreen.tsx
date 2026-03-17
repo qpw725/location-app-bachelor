@@ -11,126 +11,17 @@ import {
   RefreshControl,
 } from "react-native";
 import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
-import { CompositeScreenProps } from "@react-navigation/native";
+import { CompositeScreenProps, useFocusEffect } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainTabParamList, RootStackParamList } from "../../App";
-import { supabase } from "../supabase";
+import { fetchEventBuckets, type EventItem } from "../data/eventStore";
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, "Events">,
   NativeStackScreenProps<RootStackParamList>
 >;
 
-type DbEventRow = {
-  id: string;
-  title: string | null;
-  location: string | null;
-  start_time: string | null;
-  end_time: string | null;
-  genre: string | null;
-  private: boolean | null;
-  creator_id: string | null;
-};
-
-type ProfileRow = {
-  id: string;
-  username: string | null;
-  first_name: string | null;
-  last_name: string | null;
-};
-
-type EventItem = {
-  id: string;
-  title: string;
-  time: string;
-  place: string;
-  host: string;
-  genre: string;
-  visibility: "Public" | "Private";
-  startAt: Date | null;
-  endAt: Date | null;
-  creatorId: string | null;
-};
-
-type EventRelationConfig = {
-  table: string;
-  eventIdColumn: string;
-  userIdColumn: string;
-  statusColumn?: string;
-  acceptedStatuses?: string[];
-};
-
-const relationTableCandidates: EventRelationConfig[] = [
-  {
-    table: "event_invites",
-    eventIdColumn: "event_id",
-    userIdColumn: "invitee_id",
-    statusColumn: "status",
-    acceptedStatuses: ["accepted", "pending"],
-  },
-  {
-    table: "event_participants",
-    eventIdColumn: "event_id",
-    userIdColumn: "user_id",
-    statusColumn: "status",
-    acceptedStatuses: ["accepted", "attending", "invited"],
-  },
-  {
-    table: "event_members",
-    eventIdColumn: "event_id",
-    userIdColumn: "user_id",
-  },
-  {
-    table: "event_attendees",
-    eventIdColumn: "event_id",
-    userIdColumn: "user_id",
-  },
-];
-
-function formatHostName(profile: ProfileRow | undefined, creatorId: string | null, activeUserId: string | null) {
-  if (creatorId && activeUserId && creatorId === activeUserId) {
-    return "You";
-  }
-  if (!profile) {
-    return "Host";
-  }
-  const first = profile.first_name?.trim() ?? "";
-  const last = profile.last_name?.trim() ?? "";
-  const fullName = `${first} ${last}`.trim();
-  return fullName || profile.username?.trim() || "Host";
-}
-
-function formatEventTime(startIso: string | null, endIso: string | null) {
-  if (!startIso) {
-    return "Time not set";
-  }
-  const start = new Date(startIso);
-  const end = endIso ? new Date(endIso) : null;
-  const dateLabel = start.toLocaleDateString([], { weekday: "short", day: "2-digit", month: "short" });
-  const startLabel = start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  if (!end) {
-    return `${dateLabel} at ${startLabel}`;
-  }
-  const endLabel = end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  return `${dateLabel} ${startLabel} - ${endLabel}`;
-}
-
-function mapEventRow(row: DbEventRow, creatorProfile: ProfileRow | undefined, activeUserId: string | null): EventItem {
-  return {
-    id: row.id,
-    title: row.title?.trim() || "Untitled event",
-    time: formatEventTime(row.start_time, row.end_time),
-    place: row.location?.trim() || "Location not set",
-    host: formatHostName(creatorProfile, row.creator_id, activeUserId),
-    genre: row.genre?.trim() || "General",
-    visibility: row.private ? "Private" : "Public",
-    startAt: row.start_time ? new Date(row.start_time) : null,
-    endAt: row.end_time ? new Date(row.end_time) : null,
-    creatorId: row.creator_id,
-  };
-}
-
-function MyEventPreviewCard({ title, time, place, host, genre, visibility }: EventItem) {
+function MyEventPreviewCard({ title, description, time, place, host, genre, visibility }: EventItem) {
   return (
     <View style={styles.previewEventCard}>
       <View style={styles.eventHeader}>
@@ -139,6 +30,7 @@ function MyEventPreviewCard({ title, time, place, host, genre, visibility }: Eve
           <Text style={styles.visibilityText}>{visibility}</Text>
         </View>
       </View>
+      <Text style={styles.eventDescription} numberOfLines={2}>{description}</Text>
       <Text style={styles.eventMeta}>{time}</Text>
       <Text style={styles.eventMeta}>{place}</Text>
       <View style={styles.discoverFooter}>
@@ -149,10 +41,11 @@ function MyEventPreviewCard({ title, time, place, host, genre, visibility }: Eve
   );
 }
 
-function DiscoverEventCard({ title, time, place, host, genre }: EventItem) {
+function DiscoverEventCard({ title, description, time, place, host, genre }: EventItem) {
   return (
     <View style={styles.discoverCard}>
       <Text style={styles.eventTitle}>{title}</Text>
+      <Text style={styles.eventDescription} numberOfLines={3}>{description}</Text>
       <Text style={styles.eventMeta}>{time}</Text>
       <Text style={styles.eventMeta}>{place}</Text>
       <View style={styles.discoverFooter}>
@@ -204,13 +97,28 @@ export default function EventsScreen({ navigation }: Props) {
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [eventsError, setEventsError] = useState<string | null>(null);
-  const [activeUserId, setActiveUserId] = useState<string | null>(null);
   const [publicEvents, setPublicEvents] = useState<EventItem[]>([]);
   const [invitedEvents, setInvitedEvents] = useState<EventItem[]>([]);
   const [hostingEvents, setHostingEvents] = useState<EventItem[]>([]);
+  const [pastEvents, setPastEvents] = useState<EventItem[]>([]);
 
   const categoryOptions = useMemo(() => {
-    const seeded = ["Relaxed social", "Casual networking", "Games and drinks", "Fitness group"];
+    const seeded = [
+      "Sports",
+      "Fitness",
+      "Running",
+      "Social",
+      "Party",
+      "Food & Drinks",
+      "Celebration",
+      "Study / Work",
+      "Outdoor",
+      "Games",
+      "Wellness",
+      "Travel",
+      "Culture",
+      "Other",
+    ];
     const fromEvents = Array.from(
       new Set(publicEvents.concat(invitedEvents).map((event) => event.genre).filter((genre) => genre.length > 0))
     );
@@ -219,128 +127,17 @@ export default function EventsScreen({ navigation }: Props) {
 
   const loadEvents = useCallback(async () => {
     setEventsError(null);
-
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError) {
-      setEventsError(authError.message);
+    const { data, error } = await fetchEventBuckets();
+    if (error || !data) {
+      setEventsError(error ?? "Could not load events.");
       setLoadingEvents(false);
       return;
     }
 
-    const userId = authData.user?.id ?? null;
-    setActiveUserId(userId);
-
-    const { data: publicRows, error: publicError } = await supabase
-      .from("events")
-      .select("id, title, location, start_time, end_time, genre, private, creator_id")
-      .eq("private", false)
-      .order("start_time", { ascending: true });
-
-    if (publicError) {
-      setEventsError(publicError.message);
-      setLoadingEvents(false);
-      return;
-    }
-
-    const publicEventRows = (publicRows ?? []) as DbEventRow[];
-    const invitedEventIds = new Set<string>();
-
-    if (userId) {
-      for (const relation of relationTableCandidates) {
-        const selectColumns = relation.statusColumn
-          ? `${relation.eventIdColumn}, ${relation.statusColumn}`
-          : relation.eventIdColumn;
-
-        const { data, error } = await supabase
-          .from(relation.table)
-          .select(selectColumns)
-          .eq(relation.userIdColumn, userId);
-
-        if (error) {
-          if (error.code === "42P01" || error.code === "42703") {
-            continue;
-          }
-          setEventsError(error.message);
-          setLoadingEvents(false);
-          return;
-        }
-
-        const rows = ((data ?? []) as unknown) as Record<string, string | null>[];
-        for (const row of rows) {
-          const eventId = row[relation.eventIdColumn];
-          const statusValue = relation.statusColumn ? row[relation.statusColumn] : null;
-          if (!eventId) {
-            continue;
-          }
-          if (relation.acceptedStatuses && relation.statusColumn) {
-            if (!statusValue || !relation.acceptedStatuses.includes(String(statusValue).toLowerCase())) {
-              continue;
-            }
-          }
-          invitedEventIds.add(String(eventId));
-        }
-      }
-    }
-
-    const invitedRows: DbEventRow[] = [];
-    if (invitedEventIds.size > 0) {
-      const { data, error } = await supabase
-        .from("events")
-        .select("id, title, location, start_time, end_time, genre, private, creator_id")
-        .in("id", Array.from(invitedEventIds))
-        .order("start_time", { ascending: true });
-
-      if (error) {
-        setEventsError(error.message);
-        setLoadingEvents(false);
-        return;
-      }
-
-      invitedRows.push(...((data ?? []) as DbEventRow[]));
-    }
-
-    const myHostingRows: DbEventRow[] = [];
-    if (userId) {
-      const { data, error } = await supabase
-        .from("events")
-        .select("id, title, location, start_time, end_time, genre, private, creator_id")
-        .eq("creator_id", userId)
-        .order("start_time", { ascending: true });
-
-      if (error) {
-        setEventsError(error.message);
-        setLoadingEvents(false);
-        return;
-      }
-
-      myHostingRows.push(...((data ?? []) as DbEventRow[]));
-    }
-
-    const creatorIds = Array.from(
-      new Set(publicEventRows.concat(invitedRows, myHostingRows).map((row) => row.creator_id).filter(Boolean))
-    ) as string[];
-    const profileMap = new Map<string, ProfileRow>();
-
-    if (creatorIds.length > 0) {
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, username, first_name, last_name")
-        .in("id", creatorIds);
-
-      if (!profilesError) {
-        for (const profile of (profiles ?? []) as ProfileRow[]) {
-          profileMap.set(profile.id, profile);
-        }
-      }
-    }
-
-    const mappedPublic = publicEventRows.map((row) => mapEventRow(row, profileMap.get(row.creator_id ?? ""), userId));
-    const mappedInvited = invitedRows.map((row) => mapEventRow(row, profileMap.get(row.creator_id ?? ""), userId));
-    const mappedHosting = myHostingRows.map((row) => mapEventRow(row, profileMap.get(row.creator_id ?? ""), userId));
-
-    setPublicEvents(mappedPublic);
-    setInvitedEvents(mappedInvited);
-    setHostingEvents(mappedHosting);
+    setPublicEvents(data.publicEvents);
+    setInvitedEvents(data.attendingEvents);
+    setHostingEvents(data.hostingEvents);
+    setPastEvents(data.pastEvents);
     setLoadingEvents(false);
   }, []);
 
@@ -348,16 +145,11 @@ export default function EventsScreen({ navigation }: Props) {
     void loadEvents();
   }, [loadEvents]);
 
-  const pastEvents = useMemo(() => {
-    const now = Date.now();
-    return invitedEvents
-      .concat(hostingEvents)
-      .filter((event) => {
-        const endTime = event.endAt?.getTime() ?? event.startAt?.getTime();
-        return typeof endTime === "number" && endTime < now;
-      })
-      .sort((a, b) => (b.startAt?.getTime() ?? 0) - (a.startAt?.getTime() ?? 0));
-  }, [hostingEvents, invitedEvents]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadEvents();
+    }, [loadEvents])
+  );
 
   const filteredDiscoverEvents = publicEvents.filter((event) => {
     const query = discoverSearch.trim().toLowerCase();
@@ -403,11 +195,6 @@ export default function EventsScreen({ navigation }: Props) {
       return true;
     });
   }, [filteredDiscoverEvents]);
-
-  const attendingEvents = useMemo(() => {
-    const hostedIds = new Set(hostingEvents.map((event) => event.id));
-    return invitedEvents.filter((event) => !hostedIds.has(event.id));
-  }, [hostingEvents, invitedEvents]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -489,8 +276,8 @@ export default function EventsScreen({ navigation }: Props) {
         <View style={styles.section}>
           <CategoryCard
             label="Attending"
-            count={attendingEvents.length}
-            preview={attendingEvents[0]}
+            count={invitedEvents.length}
+            preview={invitedEvents[0]}
             onPress={() => navigation.navigate("AttendingEvents")}
           />
           <CategoryCard
@@ -718,6 +505,7 @@ const styles = StyleSheet.create({
   },
   eventTitle: { fontSize: 16, fontWeight: "700", color: "#1a2233", marginBottom: 4 },
   eventMeta: { fontSize: 13, color: "#5d6a80" },
+  eventDescription: { fontSize: 13, color: "#4c5e7b", marginBottom: 6 },
   visibilityBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,

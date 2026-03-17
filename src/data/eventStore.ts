@@ -1,0 +1,429 @@
+import { supabase } from "../supabase";
+
+type DbEventRow = {
+  id: string;
+  title: string | null;
+  description: string | null;
+  location: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  genre: string | null;
+  private: boolean | null;
+  creator_id: string | null;
+};
+
+type ProfileRow = {
+  id: string;
+  username: string | null;
+  first_name: string | null;
+  last_name: string | null;
+};
+
+export type EventItem = {
+  id: string;
+  title: string;
+  description: string;
+  time: string;
+  place: string;
+  host: string;
+  genre: string;
+  visibility: "Public" | "Private";
+  startAt: Date | null;
+  endAt: Date | null;
+  creatorId: string | null;
+};
+
+export type EventBuckets = {
+  publicEvents: EventItem[];
+  attendingEvents: EventItem[];
+  hostingEvents: EventItem[];
+  pastEvents: EventItem[];
+};
+
+export type HomeOverview = {
+  upcomingCount: number;
+  pendingInviteCount: number;
+  hostingCount: number;
+};
+
+function formatHostName(profile: ProfileRow | undefined, creatorId: string | null, activeUserId: string | null) {
+  if (creatorId && activeUserId && creatorId === activeUserId) {
+    return "You";
+  }
+  if (!profile) {
+    return "Host";
+  }
+  const first = profile.first_name?.trim() ?? "";
+  const last = profile.last_name?.trim() ?? "";
+  const fullName = `${first} ${last}`.trim();
+  return fullName || profile.username?.trim() || "Host";
+}
+
+function formatEventTime(startIso: string | null, endIso: string | null) {
+  if (!startIso) {
+    return "Time not set";
+  }
+  const start = new Date(startIso);
+  const end = endIso ? new Date(endIso) : null;
+  const dateLabel = start.toLocaleDateString([], { weekday: "short", day: "2-digit", month: "short" });
+  const startLabel = start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (!end) {
+    return `${dateLabel} at ${startLabel}`;
+  }
+  const endLabel = end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return `${dateLabel} ${startLabel} - ${endLabel}`;
+}
+
+function mapEventRow(row: DbEventRow, creatorProfile: ProfileRow | undefined, activeUserId: string | null): EventItem {
+  return {
+    id: row.id,
+    title: row.title?.trim() || "Untitled event",
+    description: row.description?.trim() || "No description provided",
+    time: formatEventTime(row.start_time, row.end_time),
+    place: row.location?.trim() || "Location not set",
+    host: formatHostName(creatorProfile, row.creator_id, activeUserId),
+    genre: row.genre?.trim() || "General",
+    visibility: row.private ? "Private" : "Public",
+    startAt: row.start_time ? new Date(row.start_time) : null,
+    endAt: row.end_time ? new Date(row.end_time) : null,
+    creatorId: row.creator_id,
+  };
+}
+
+function isPastEvent(event: EventItem, now: number) {
+  const endTime = event.endAt?.getTime() ?? event.startAt?.getTime();
+  return typeof endTime === "number" && endTime < now;
+}
+
+function sortAscending(events: EventItem[]) {
+  return [...events].sort((a, b) => (a.startAt?.getTime() ?? 0) - (b.startAt?.getTime() ?? 0));
+}
+
+function sortDescending(events: EventItem[]) {
+  return [...events].sort((a, b) => (b.startAt?.getTime() ?? 0) - (a.startAt?.getTime() ?? 0));
+}
+
+export async function fetchEventBuckets(): Promise<{ data: EventBuckets | null; error: string | null }> {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    return { data: null, error: authError.message };
+  }
+
+  const userId = authData.user?.id ?? null;
+
+  const { data: publicRows, error: publicError } = await supabase
+    .from("events")
+    .select("id, title, description, location, start_time, end_time, genre, private, creator_id")
+    .eq("private", false)
+    .order("start_time", { ascending: true });
+
+  if (publicError) {
+    return { data: null, error: publicError.message };
+  }
+
+  const invitedEventIds = new Set<string>();
+  if (userId) {
+    const { data: inviteRows, error: inviteError } = await supabase
+      .from("event_invites")
+      .select("event_id, status")
+      .eq("invitee_id", userId);
+
+    if (inviteError) {
+      return { data: null, error: inviteError.message };
+    }
+
+    for (const row of ((inviteRows ?? []) as Record<string, string | null>[])) {
+      const eventId = row.event_id;
+      const statusValue = row.status;
+      if (!eventId || !statusValue) {
+        continue;
+      }
+      if (!["accepted", "pending"].includes(String(statusValue).toLowerCase())) {
+        continue;
+      }
+      invitedEventIds.add(String(eventId));
+    }
+  }
+
+  const invitedRows: DbEventRow[] = [];
+  if (invitedEventIds.size > 0) {
+    const { data, error } = await supabase
+      .from("events")
+      .select("id, title, description, location, start_time, end_time, genre, private, creator_id")
+      .in("id", Array.from(invitedEventIds))
+      .order("start_time", { ascending: true });
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+
+    invitedRows.push(...((data ?? []) as DbEventRow[]));
+  }
+
+  const myHostingRows: DbEventRow[] = [];
+  if (userId) {
+    const { data, error } = await supabase
+      .from("events")
+      .select("id, title, description, location, start_time, end_time, genre, private, creator_id")
+      .eq("creator_id", userId)
+      .order("start_time", { ascending: true });
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+
+    myHostingRows.push(...((data ?? []) as DbEventRow[]));
+  }
+
+  const creatorIds = Array.from(
+    new Set((publicRows ?? []).concat(invitedRows, myHostingRows).map((row) => row.creator_id).filter(Boolean))
+  ) as string[];
+  const profileMap = new Map<string, ProfileRow>();
+
+  if (creatorIds.length > 0) {
+    const { data: profiles, error: profilesError } = await supabase
+      .from("profiles")
+      .select("id, username, first_name, last_name")
+      .in("id", creatorIds);
+
+    if (!profilesError) {
+      for (const profile of (profiles ?? []) as ProfileRow[]) {
+        profileMap.set(profile.id, profile);
+      }
+    }
+  }
+
+  const mappedPublic = ((publicRows ?? []) as DbEventRow[]).map((row) =>
+    mapEventRow(row, profileMap.get(row.creator_id ?? ""), userId)
+  );
+  const mappedInvited = invitedRows.map((row) => mapEventRow(row, profileMap.get(row.creator_id ?? ""), userId));
+  const mappedHosting = myHostingRows.map((row) => mapEventRow(row, profileMap.get(row.creator_id ?? ""), userId));
+
+  const now = Date.now();
+  const hostingEvents = sortAscending(mappedHosting.filter((event) => !isPastEvent(event, now)));
+  const invitedUpcoming = mappedInvited.filter((event) => !isPastEvent(event, now));
+  const hostedIds = new Set(hostingEvents.map((event) => event.id));
+  const attendingEvents = sortAscending(invitedUpcoming.filter((event) => !hostedIds.has(event.id)));
+
+  const pastMap = new Map<string, EventItem>();
+  for (const event of mappedHosting.concat(mappedInvited)) {
+    if (isPastEvent(event, now)) {
+      pastMap.set(event.id, event);
+    }
+  }
+
+  return {
+    data: {
+      publicEvents: sortAscending(mappedPublic),
+      attendingEvents,
+      hostingEvents,
+      pastEvents: sortDescending(Array.from(pastMap.values())),
+    },
+    error: null,
+  };
+}
+
+export async function fetchHomeOverview(): Promise<{ data: HomeOverview | null; error: string | null }> {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    return { data: null, error: authError.message };
+  }
+
+  const userId = authData.user?.id ?? null;
+  if (!userId) {
+    return {
+      data: { upcomingCount: 0, pendingInviteCount: 0, hostingCount: 0 },
+      error: null,
+    };
+  }
+
+  const { data: hostingRows, error: hostingError } = await supabase
+    .from("events")
+    .select("id, start_time, end_time")
+    .eq("creator_id", userId);
+
+  if (hostingError) {
+    return { data: null, error: hostingError.message };
+  }
+
+  const now = Date.now();
+  const hostingEventIds = new Set<string>();
+  for (const row of (hostingRows ?? []) as Array<{ id: string; start_time: string | null; end_time: string | null }>) {
+    const endTime = row.end_time ? new Date(row.end_time).getTime() : row.start_time ? new Date(row.start_time).getTime() : NaN;
+    if (!Number.isNaN(endTime) && endTime >= now) {
+      hostingEventIds.add(row.id);
+    }
+  }
+
+  const { data: inviteRows, error: inviteError } = await supabase
+    .from("event_invites")
+    .select("event_id, status")
+    .eq("invitee_id", userId);
+
+  if (inviteError) {
+    return { data: null, error: inviteError.message };
+  }
+
+  const pendingInviteIds = new Set<string>();
+  const acceptedInviteIds = new Set<string>();
+  for (const row of (inviteRows ?? []) as Array<{ event_id: string | null; status: string | null }>) {
+    if (!row.event_id || !row.status) {
+      continue;
+    }
+    const status = row.status.toLowerCase();
+    if (status === "pending") {
+      pendingInviteIds.add(row.event_id);
+    }
+    if (status === "accepted") {
+      acceptedInviteIds.add(row.event_id);
+    }
+  }
+
+  const involvedIds = Array.from(new Set([...pendingInviteIds, ...acceptedInviteIds]));
+  const upcomingPendingIds = new Set<string>();
+  const upcomingAcceptedIds = new Set<string>();
+
+  if (involvedIds.length > 0) {
+    const { data: invitedEventRows, error: invitedEventsError } = await supabase
+      .from("events")
+      .select("id, start_time, end_time")
+      .in("id", involvedIds);
+
+    if (invitedEventsError) {
+      return { data: null, error: invitedEventsError.message };
+    }
+
+    for (const row of (invitedEventRows ?? []) as Array<{ id: string; start_time: string | null; end_time: string | null }>) {
+      const endTime = row.end_time ? new Date(row.end_time).getTime() : row.start_time ? new Date(row.start_time).getTime() : NaN;
+      if (Number.isNaN(endTime) || endTime < now) {
+        continue;
+      }
+      if (pendingInviteIds.has(row.id)) {
+        upcomingPendingIds.add(row.id);
+      }
+      if (acceptedInviteIds.has(row.id) && !hostingEventIds.has(row.id)) {
+        upcomingAcceptedIds.add(row.id);
+      }
+    }
+  }
+
+  return {
+    data: {
+      upcomingCount: hostingEventIds.size + upcomingAcceptedIds.size,
+      pendingInviteCount: upcomingPendingIds.size,
+      hostingCount: hostingEventIds.size,
+    },
+    error: null,
+  };
+}
+
+export async function deleteHostedEvent(eventId: string): Promise<{ error: string | null }> {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    return { error: authError.message };
+  }
+
+  const userId = authData.user?.id;
+  if (!userId) {
+    return { error: "Could not identify current user." };
+  }
+
+  const { data, error } = await supabase
+    .from("events")
+    .delete()
+    .eq("id", eventId)
+    .eq("creator_id", userId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  if (!data) {
+    return { error: "Event not found or you do not have permission to delete it." };
+  }
+
+  return { error: null };
+}
+
+export async function leaveEvent(eventId: string): Promise<{ error: string | null }> {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    return { error: authError.message };
+  }
+
+  const userId = authData.user?.id;
+  if (!userId) {
+    return { error: "Could not identify current user." };
+  }
+
+  const { data, error } = await supabase
+    .from("event_invites")
+    .delete()
+    .eq("event_id", eventId)
+    .eq("invitee_id", userId)
+    .select("event_id")
+    .maybeSingle();
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  if (!data) {
+    return { error: "Invite not found or you do not have permission to leave this event." };
+  }
+
+  return { error: null };
+}
+
+export async function updateHostedEvent(input: {
+  eventId: string;
+  description: string;
+  location: string;
+  isPrivate: boolean;
+  startAt: Date;
+  endAt: Date;
+}): Promise<{ error: string | null }> {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    return { error: authError.message };
+  }
+
+  const userId = authData.user?.id;
+  if (!userId) {
+    return { error: "Could not identify current user." };
+  }
+
+  if (input.startAt.getTime() <= Date.now()) {
+    return { error: "Start time must be in the future." };
+  }
+
+  if (input.endAt.getTime() <= input.startAt.getTime()) {
+    return { error: "End time must be after start time." };
+  }
+
+  const { data, error } = await supabase
+    .from("events")
+    .update({
+      description: input.description.trim() ? input.description.trim() : null,
+      location: input.location.trim() ? input.location.trim() : null,
+      private: input.isPrivate,
+      start_time: input.startAt.toISOString(),
+      end_time: input.endAt.toISOString(),
+    })
+    .eq("id", input.eventId)
+    .eq("creator_id", userId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  if (!data) {
+    return { error: "Event not found or you do not have permission to edit it." };
+  }
+
+  return { error: null };
+}

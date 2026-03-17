@@ -61,8 +61,10 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
     0,
     0
   );
+  const now = new Date();
+  const hasFutureStartTime = eventStartOnDate.getTime() > now.getTime();
   const hasValidTimeRange = eventEndOnDate.getTime() > eventStartOnDate.getTime();
-  const canContinue = eventName.trim().length > 0 && hasValidTimeRange;
+  const canContinue = eventName.trim().length > 0 && hasValidTimeRange && hasFutureStartTime;
   const formattedDate = eventDate.toLocaleDateString([], {
     weekday: "short",
     day: "2-digit",
@@ -154,6 +156,7 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
                   mode="date"
                   display="compact"
                   onChange={onDateChange}
+                  minimumDate={new Date()}
                 />
               </View>
             ) : (
@@ -167,6 +170,7 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
                     mode="date"
                     display="default"
                     onChange={onDateChange}
+                    minimumDate={new Date()}
                   />
                 )}
               </>
@@ -230,6 +234,10 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
               </>
             )}
           </View>
+
+          {!hasFutureStartTime ? (
+            <Text style={styles.errorText}>Start time must be in the future.</Text>
+          ) : null}
 
           {!hasValidTimeRange ? (
             <Text style={styles.errorText}>End time must be after start time.</Text>

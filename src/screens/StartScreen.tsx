@@ -1,10 +1,11 @@
 import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
-import { CompositeScreenProps } from "@react-navigation/native";
+import { CompositeScreenProps, useFocusEffect } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainTabParamList, RootStackParamList } from "../../App";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../supabase";
+import { fetchHomeOverview } from "../data/eventStore";
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, "Start">,
@@ -15,8 +16,11 @@ type Props = CompositeScreenProps<
 
 export default function StartScreen({ navigation }: Props) {
   const [displayUsername, setDisplayUsername] = useState("No username found");
-  
-useEffect(() => {
+  const [upcomingCount, setUpcomingCount] = useState(0);
+  const [pendingInviteCount, setPendingInviteCount] = useState(0);
+  const [hostingCount, setHostingCount] = useState(0);
+
+  useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       const user = data.user;
       const metadata = user?.user_metadata as
@@ -27,6 +31,33 @@ useEffect(() => {
     });
   }, []);
 
+  const loadOverview = useCallback(async () => {
+    const { data } = await fetchHomeOverview();
+    if (!data) {
+      return;
+    }
+    setUpcomingCount(data.upcomingCount);
+    setPendingInviteCount(data.pendingInviteCount);
+    setHostingCount(data.hostingCount);
+  }, []);
+
+  useEffect(() => {
+    void loadOverview();
+  }, [loadOverview]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadOverview();
+    }, [loadOverview])
+  );
+
+  const heroChipText =
+    upcomingCount > 0
+      ? `${upcomingCount} upcoming ${upcomingCount === 1 ? "event" : "events"}`
+      : pendingInviteCount > 0
+        ? `${pendingInviteCount} pending ${pendingInviteCount === 1 ? "invite" : "invites"}`
+        : "No upcoming events yet";
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
@@ -34,7 +65,7 @@ useEffect(() => {
         <Text style={styles.title}>Hi, {displayUsername}</Text>
         <Text style={styles.subtitle}>Plan your next meetup fast.</Text>
         <View style={styles.heroChip}>
-          <Text style={styles.heroChipText}>No upcoming events yet</Text>
+          <Text style={styles.heroChipText}>{heroChipText}</Text>
         </View>
       </View>
 
@@ -58,15 +89,15 @@ useEffect(() => {
         </View>
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>0</Text>
+            <Text style={styles.statValue}>{upcomingCount}</Text>
             <Text style={styles.statLabel}>Upcoming</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>0</Text>
+            <Text style={styles.statValue}>{pendingInviteCount}</Text>
             <Text style={styles.statLabel}>Pending invites</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>0</Text>
+            <Text style={styles.statValue}>{hostingCount}</Text>
             <Text style={styles.statLabel}>Hosting</Text>
           </View>
         </View>
