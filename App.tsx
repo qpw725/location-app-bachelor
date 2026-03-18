@@ -5,6 +5,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, View } from "react-native";
 import { Session } from "@supabase/supabase-js";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 import StartScreen from "./src/screens/StartScreen";
 import EventsScreen from "./src/screens/EventsScreen";
@@ -96,7 +97,25 @@ function AuthScreens() {
 
 function MainTabs() {
   return (
-    <Tab.Navigator>
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ color, size }) => {
+          let iconName: keyof typeof Ionicons.glyphMap = "home";
+
+          if (route.name === "Start") {
+            iconName = "home";
+          } else if (route.name === "Events") {
+            iconName = "calendar";
+          } else if (route.name === "Inbox") {
+            iconName = "mail";
+          } else if (route.name === "MyProfile") {
+            iconName = "person";
+          }
+
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+      })}
+    >
       <Tab.Screen name="Start" component={StartScreen} options={{ title: "Home", headerTitle: "Home" }} />
       <Tab.Screen name="Events" component={EventsScreen} options={{ title: "Events", headerTitle: "Events" }} />
       <Tab.Screen name="Inbox" component={InboxScreen} options={{ title: "Inbox", headerTitle: "Inbox" }} />

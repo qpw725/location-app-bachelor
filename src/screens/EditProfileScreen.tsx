@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import type { RootStackParamList } from "../../App";
+import ProfileAvatar from "../components/ProfileAvatar";
+import { fetchCurrentProfile, getProfileInitials, pickAndUploadAvatar, removeAvatar } from "../profile";
 import { supabase } from "../supabase";
 
 type Props = NativeStackScreenProps<RootStackParamList, "EditProfile">;
@@ -11,6 +13,8 @@ type ProfileFormState = {
   firstName: string;
   lastName: string;
   email: string;
+  avatarPath: string | null;
+  avatarUrl: string | null;
   newPassword: string;
   confirmPassword: string;
 };
@@ -20,6 +24,8 @@ const initialFormState: ProfileFormState = {
   firstName: "",
   lastName: "",
   email: "",
+  avatarPath: null,
+  avatarUrl: null,
   newPassword: "",
   confirmPassword: "",
 };
@@ -30,6 +36,8 @@ export default function EditProfileScreen({ navigation, route }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState("");
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const initialField = route.params?.initialField;
 
   useEffect(() => {
@@ -39,28 +47,32 @@ export default function EditProfileScreen({ navigation, route }: Props) {
       setIsLoading(true);
       setErrorMessage(null);
 
-      const { data, error } = await supabase.auth.getUser();
+      const { profile, error } = await fetchCurrentProfile();
 
       if (!isMounted) {
         return;
       }
 
       if (error) {
-        setErrorMessage(error.message);
+        setErrorMessage(error);
         setIsLoading(false);
         return;
       }
 
-      const user = data.user;
-      const metadata = user?.user_metadata as
-        | { username?: string; first_name?: string; last_name?: string }
-        | undefined;
+      if (!profile) {
+        setErrorMessage("Could not load your profile.");
+        setIsLoading(false);
+        return;
+      }
 
+      setCurrentUserId(profile.id);
       setForm({
-        username: metadata?.username?.trim() ?? "",
-        firstName: metadata?.first_name?.trim() ?? "",
-        lastName: metadata?.last_name?.trim() ?? "",
-        email: user?.email?.trim() ?? "",
+        username: profile.username === "No username found" ? "" : profile.username,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        email: profile.email === "No email found" ? "" : profile.email,
+        avatarPath: profile.avatarPath,
+        avatarUrl: profile.avatarUrl,
         newPassword: "",
         confirmPassword: "",
       });
@@ -100,6 +112,80 @@ export default function EditProfileScreen({ navigation, route }: Props) {
 
   function updateField<K extends keyof ProfileFormState>(key: K, value: ProfileFormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  const initials = getProfileInitials(`${form.firstName} ${form.lastName}`.trim() || " ", form.username);
+
+  function promptForAvatarChange() {
+    if (!currentUserId || isUploadingAvatar) {
+      return;
+    }
+
+    Alert.alert("Change profile photo", "Choose how you want to update your avatar.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Choose photo", onPress: () => void handleAvatarChange("library") },
+      { text: "Take photo", onPress: () => void handleAvatarChange("camera") },
+      ...(form.avatarPath ? [{ text: "Remove photo", style: "destructive" as const, onPress: () => void handleAvatarRemove() }] : []),
+    ]);
+  }
+
+  async function handleAvatarChange(source: "camera" | "library") {
+    if (!currentUserId) {
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const result = await pickAndUploadAvatar({
+      source,
+      userId: currentUserId,
+      currentAvatarPath: form.avatarPath,
+    });
+
+    setIsUploadingAvatar(false);
+
+    if (result.error) {
+      setErrorMessage(result.error);
+      return;
+    }
+
+    if (!result.cancelled) {
+      setForm((current) => ({
+        ...current,
+        avatarPath: result.avatarPath,
+        avatarUrl: result.avatarUrl,
+      }));
+    }
+  }
+
+  async function handleAvatarRemove() {
+    if (!currentUserId) {
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const result = await removeAvatar({
+      userId: currentUserId,
+      currentAvatarPath: form.avatarPath,
+    });
+
+    setIsUploadingAvatar(false);
+
+    if (result.error) {
+      setErrorMessage(result.error);
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      avatarPath: null,
+      avatarUrl: null,
+    }));
   }
 
   async function handleSave() {
@@ -231,6 +317,17 @@ export default function EditProfileScreen({ navigation, route }: Props) {
       </View>
 
       <View style={styles.formCard}>
+        <View style={styles.avatarSection}>
+          <ProfileAvatar
+            avatarUrl={form.avatarUrl}
+            initials={initials}
+            size={116}
+            onPress={promptForAvatarChange}
+            isUploading={isUploadingAvatar}
+          />
+          <Text style={styles.avatarHint}>Tap the photo to upload or take a new one</Text>
+        </View>
+
         <Text style={styles.sectionTitle}>Profile information</Text>
 
         <Text style={styles.label}>Username</Text>
@@ -310,7 +407,11 @@ export default function EditProfileScreen({ navigation, route }: Props) {
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
         {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
 
-        <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]} onPress={handleSave} disabled={isSaving}>
+        <Pressable
+          style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
+          onPress={handleSave}
+          disabled={isSaving || isUploadingAvatar}
+        >
           <Text style={styles.primaryButtonText}>{isSaving ? "Saving..." : "Save changes"}</Text>
         </Pressable>
 
@@ -368,6 +469,16 @@ const styles = StyleSheet.create({
     padding: 18,
     borderWidth: 1,
     borderColor: "#d7e1f2",
+  },
+  avatarSection: {
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  avatarHint: {
+    marginTop: 10,
+    color: "#5d6a80",
+    fontSize: 13,
+    fontWeight: "600",
   },
   sectionTitle: {
     fontSize: 18,

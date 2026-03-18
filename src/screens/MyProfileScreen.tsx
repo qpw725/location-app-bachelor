@@ -1,55 +1,45 @@
 import { useCallback, useState } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import { Alert, View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { CompositeScreenProps, useFocusEffect } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainTabParamList, RootStackParamList } from "../../App";
+import ProfileAvatar from "../components/ProfileAvatar";
+import { CurrentProfile, fetchCurrentProfile, getProfileInitials, pickAndUploadAvatar, removeAvatar } from "../profile";
 import { supabase } from "../supabase";
 
-type Props = CompositeScreenProps<
-  BottomTabScreenProps<MainTabParamList, "MyProfile">,
-  NativeStackScreenProps<RootStackParamList>
->;
+type Props = CompositeScreenProps<BottomTabScreenProps<MainTabParamList, "MyProfile">, NativeStackScreenProps<RootStackParamList>>;
 
-type ProfileDetails = {
-  email: string;
-  fullName: string;
-  username: string;
-  memberSince: string;
-};
-
-const defaultProfile: ProfileDetails = {
+const defaultProfile: CurrentProfile = {
+  id: "",
   email: "No email found",
   fullName: "No name found",
+  firstName: "",
+  lastName: "",
   username: "No username found",
   memberSince: "Unknown",
+  avatarPath: null,
+  avatarUrl: null,
 };
 
 export default function MyProfileScreen({ navigation }: Props) {
-  const [profile, setProfile] = useState<ProfileDetails>(defaultProfile);
+  const [profile, setProfile] = useState<CurrentProfile>(defaultProfile);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [avatarMessage, setAvatarMessage] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   const loadProfile = useCallback(async () => {
-    const { data } = await supabase.auth.getUser();
-    const user = data.user;
-    const metadata = user?.user_metadata as
-      | { first_name?: string; last_name?: string; username?: string }
-      | undefined;
+    const { profile: currentProfile, error } = await fetchCurrentProfile();
 
-    const firstName = metadata?.first_name?.trim() ?? "";
-    const lastName = metadata?.last_name?.trim() ?? "";
-    const fullName = `${firstName} ${lastName}`.trim();
-    const createdAt = user?.created_at ? new Date(user.created_at) : null;
-    const createdAtLabel =
-      createdAt && !Number.isNaN(createdAt.getTime())
-        ? createdAt.toLocaleDateString([], { month: "short", day: "2-digit", year: "numeric" })
-        : "Unknown";
+    if (error) {
+      setErrorMessage(error);
+      return;
+    }
 
-    setProfile({
-      email: user?.email ?? "No email found",
-      fullName: fullName || "No name found",
-      username: metadata?.username?.trim() || "No username found",
-      memberSince: createdAtLabel,
-    });
+    if (currentProfile) {
+      setProfile(currentProfile);
+      setErrorMessage(null);
+    }
   }, []);
 
   useFocusEffect(
@@ -62,23 +52,93 @@ export default function MyProfileScreen({ navigation }: Props) {
     await supabase.auth.signOut();
   }
 
-  const initials = profile.fullName
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
+  const initials = getProfileInitials(profile.fullName, profile.username);
 
-  function openEditProfile(initialField: "username" | "name" | "email" | "password") {
-    navigation.navigate("EditProfile", { initialField });
+  function openEditProfile() {
+    navigation.navigate("EditProfile");
+  }
+
+  function promptForAvatarChange() {
+    if (!profile.id || isUploadingAvatar) {
+      return;
+    }
+
+    Alert.alert("Change profile photo", "Choose how you want to update your avatar.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Choose photo", onPress: () => void handleAvatarChange("library") },
+      { text: "Take photo", onPress: () => void handleAvatarChange("camera") },
+      ...(profile.avatarPath ? [{ text: "Remove photo", style: "destructive" as const, onPress: () => void handleAvatarRemove() }] : []),
+    ]);
+  }
+
+  async function handleAvatarChange(source: "camera" | "library") {
+    if (!profile.id) {
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    setAvatarMessage(null);
+
+    const result = await pickAndUploadAvatar({
+      source,
+      userId: profile.id,
+      currentAvatarPath: profile.avatarPath,
+    });
+
+    setIsUploadingAvatar(false);
+
+    if (result.error) {
+      setAvatarMessage(result.error);
+      return;
+    }
+
+    if (!result.cancelled) {
+      setProfile((current) => ({
+        ...current,
+        avatarPath: result.avatarPath,
+        avatarUrl: result.avatarUrl,
+      }));
+    }
+  }
+
+  async function handleAvatarRemove() {
+    if (!profile.id) {
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    setAvatarMessage(null);
+
+    const result = await removeAvatar({
+      userId: profile.id,
+      currentAvatarPath: profile.avatarPath,
+    });
+
+    setIsUploadingAvatar(false);
+
+    if (result.error) {
+      setAvatarMessage(result.error);
+      return;
+    }
+
+    setProfile((current) => ({
+      ...current,
+      avatarPath: null,
+      avatarUrl: null,
+    }));
   }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.heroCard}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials || "?"}</Text>
-        </View>
+        <ProfileAvatar
+          avatarUrl={profile.avatarUrl}
+          initials={initials}
+          size={142}
+          onPress={promptForAvatarChange}
+          isUploading={isUploadingAvatar}
+        />
+        <Text style={styles.avatarHint}>Tap your photo to change it</Text>
 
         <Text style={styles.name}>{profile.fullName}</Text>
         <Text style={styles.username}>@{profile.username.replace(/^@/, "")}</Text>
@@ -93,45 +153,29 @@ export default function MyProfileScreen({ navigation }: Props) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Your information</Text>
 
-        <Pressable style={({ pressed }) => [styles.infoCard, pressed && styles.pressed]} onPress={() => openEditProfile("name")}>
-          <View style={styles.infoLeading}>
+        <View style={styles.infoPanel}>
+          <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Name</Text>
             <Text style={styles.infoValue}>{profile.fullName}</Text>
           </View>
-          <Text style={styles.rowArrow}>{">"}</Text>
-        </Pressable>
 
-        <Pressable
-          style={({ pressed }) => [styles.infoCard, styles.infoSpacing, pressed && styles.pressed]}
-          onPress={() => openEditProfile("username")}
-        >
-          <View style={styles.infoLeading}>
+          <View style={styles.infoDivider} />
+
+          <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Username</Text>
             <Text style={styles.infoValue}>@{profile.username.replace(/^@/, "")}</Text>
           </View>
-          <Text style={styles.rowArrow}>{">"}</Text>
-        </Pressable>
 
-        <Pressable
-          style={({ pressed }) => [styles.infoCard, styles.infoSpacing, pressed && styles.pressed]}
-          onPress={() => openEditProfile("email")}
-        >
-          <View style={styles.infoLeading}>
+          <View style={styles.infoDivider} />
+
+          <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Email</Text>
             <Text style={styles.infoValue}>{profile.email}</Text>
           </View>
-          <Text style={styles.rowArrow}>{">"}</Text>
-        </Pressable>
+        </View>
 
-        <Pressable
-          style={({ pressed }) => [styles.infoCard, styles.infoSpacing, pressed && styles.pressed]}
-          onPress={() => openEditProfile("password")}
-        >
-          <View style={styles.infoLeading}>
-            <Text style={styles.infoLabel}>Password</Text>
-            <Text style={styles.infoMuted}>Tap to update your password</Text>
-          </View>
-          <Text style={styles.rowArrow}>{">"}</Text>
+        <Pressable style={({ pressed }) => [styles.editButton, pressed && styles.pressed]} onPress={openEditProfile}>
+          <Text style={styles.editButtonText}>Edit profile</Text>
         </Pressable>
       </View>
 
@@ -152,6 +196,9 @@ export default function MyProfileScreen({ navigation }: Props) {
           <Text style={[styles.rowArrow, styles.signOutText]}>{">"}</Text>
         </Pressable>
       </View>
+
+      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+      {avatarMessage ? <Text style={styles.helperText}>{avatarMessage}</Text> : null}
     </ScrollView>
   );
 }
@@ -176,19 +223,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 5,
   },
-  avatar: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    backgroundColor: "#ffffff",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 14,
-  },
-  avatarText: {
-    fontSize: 34,
-    fontWeight: "800",
-    color: "#1f4fa3",
+  avatarHint: {
+    color: "#d7e4ff",
+    marginTop: 10,
+    fontSize: 13,
+    fontWeight: "600",
   },
   name: {
     fontSize: 28,
@@ -225,26 +264,22 @@ const styles = StyleSheet.create({
     color: "#1a2233",
     marginBottom: 10,
   },
-  infoCard: {
+  infoPanel: {
     borderRadius: 18,
     backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: "#d9e2f3",
     paddingHorizontal: 16,
     paddingVertical: 16,
-    flexDirection: "row",
-    alignItems: "center",
     shadowColor: "#16315f",
     shadowOpacity: 0.05,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
     elevation: 2,
   },
-  infoSpacing: {
-    marginTop: 10,
-  },
-  infoLeading: {
-    flex: 1,
+  infoRow: {
+    paddingVertical: 6,
+    width: "100%",
   },
   infoLabel: {
     fontSize: 13,
@@ -264,10 +299,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#66758c",
   },
+  infoDivider: {
+    height: 1,
+    backgroundColor: "#e6edf8",
+    marginVertical: 12,
+  },
+  editButton: {
+    marginTop: 12,
+    borderRadius: 16,
+    backgroundColor: "#1f4fa3",
+    paddingVertical: 15,
+    alignItems: "center",
+  },
+  editButtonText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "800",
+  },
   rowArrow: {
     fontSize: 24,
     color: "#1f4fa3",
     marginLeft: 12,
+  },
+  infoSpacing: {
+    marginTop: 10,
   },
   settingsRow: {
     borderRadius: 18,
@@ -290,5 +345,15 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.86,
+  },
+  helperText: {
+    marginTop: 14,
+    fontSize: 14,
+    color: "#2f7d32",
+  },
+  errorText: {
+    marginTop: 14,
+    fontSize: 14,
+    color: "#c53535",
   },
 });
