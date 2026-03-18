@@ -69,7 +69,7 @@ export default function RegisterProfileScreen({ navigation, route }: Props) {
       const debugInfo = getSupabaseDebugInfo();
       console.log("[Register] Supabase debug info:", debugInfo);
 
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
@@ -86,6 +86,28 @@ export default function RegisterProfileScreen({ navigation, route }: Props) {
         console.error("[Register] signUp error:", error);
         setErrorMessage(`${error.message}${error.status ? ` (status ${error.status})` : ""}`);
       } else {
+        const userId = data.user?.id;
+
+        if (userId) {
+          const { error: profileError } = await supabase.from("profiles").upsert(
+            {
+              id: userId,
+              username: username.trim(),
+              first_name: firstName.trim(),
+              last_name: lastName.trim(),
+              date_of_birth: formattedDobValue,
+            },
+            { onConflict: "id" }
+          );
+
+          if (profileError) {
+            console.error("[Register] profile upsert error:", profileError);
+            setErrorMessage(profileError.message);
+            setLoading(false);
+            return;
+          }
+        }
+
         setMessage("Account created. Check your email if confirmation is required.");
       }
     } catch (error: unknown) {

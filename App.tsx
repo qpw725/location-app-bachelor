@@ -13,6 +13,7 @@ import CreateEventDetailsScreen from "./src/screens/CreateEventDetailsScreen";
 import ChooseLocationScreen from "./src/screens/ChooseLocationScreen";
 import EventOverviewScreen from "./src/screens/EventOverviewScreen";
 import MyProfileScreen from "./src/screens/MyProfileScreen";
+import EditProfileScreen from "./src/screens/EditProfileScreen";
 import NotificationSettingsScreen from "./src/screens/NotificationSettingsScreen";
 import AttendingEventsScreen from "./src/screens/AttendingEventsScreen";
 import HostingEventsScreen from "./src/screens/HostingEventsScreen";
@@ -43,6 +44,11 @@ export type EventDate = {
 export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList>;
   NotificationSettings: undefined;
+  EditProfile:
+    | {
+        initialField?: "username" | "name" | "email" | "password";
+      }
+    | undefined;
   AttendingEvents: undefined;
   HostingEvents: undefined;
   PastEvents: undefined;
@@ -163,6 +169,11 @@ export default function App() {
             name="NotificationSettings"
             component={NotificationSettingsScreen}
             options={{ title: "Notifications", headerBackTitle: "Profile" }}
+          />
+          <Stack.Screen
+            name="EditProfile"
+            component={EditProfileScreen}
+            options={{ title: "Edit profile", headerBackTitle: "Profile" }}
           />
           <Stack.Screen
             name="AttendingEvents"
