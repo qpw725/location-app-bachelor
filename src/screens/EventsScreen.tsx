@@ -14,6 +14,7 @@ import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { CompositeScreenProps, useFocusEffect } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainTabParamList, RootStackParamList } from "../../App";
+import EventAttendeeSection from "../components/EventAttendeeSection";
 import { fetchEventBuckets, joinPublicEvent, type EventItem } from "../data/eventStore";
 
 type Props = CompositeScreenProps<
@@ -42,6 +43,7 @@ function MyEventPreviewCard({ title, description, time, place, host, genre, visi
 }
 
 function DiscoverEventCard({
+  id,
   title,
   description,
   time,
@@ -64,6 +66,7 @@ function DiscoverEventCard({
         <Text style={styles.discoverHost}>{host}</Text>
         <Text style={styles.discoverVibe}>{genre}</Text>
       </View>
+      <EventAttendeeSection eventId={id} />
       <View style={styles.discoverActionRow}>
         <Pressable
           style={[styles.joinButton, joining && styles.joinButtonDisabled]}

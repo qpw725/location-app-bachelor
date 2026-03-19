@@ -22,6 +22,7 @@ import {
   type HostedEventInvitee,
   updateHostedEvent,
 } from "../data/eventStore";
+import EventAttendeeSection from "../components/EventAttendeeSection";
 
 type EditDraft = {
   eventId: string;
@@ -269,8 +270,9 @@ export default function HostingEventsScreen() {
           <Text style={styles.eventMeta}>{event.place}</Text>
           <View style={styles.metaFooter}>
             <Text style={styles.metaLabel}>{event.host}</Text>
-              <Text style={styles.metaLabel}>{event.genre}</Text>
+            <Text style={styles.metaLabel}>{event.genre}</Text>
           </View>
+          <EventAttendeeSection eventId={event.id} />
           <View style={styles.actionRow}>
             <Pressable
               style={[styles.secondaryButton, processingEventId !== null && styles.secondaryButtonDisabled]}

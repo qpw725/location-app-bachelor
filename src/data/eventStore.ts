@@ -68,6 +68,13 @@ export type HostedEventInvitee = {
   status: string;
 };
 
+export type EventAttendee = {
+  id: string;
+  username: string;
+  name: string;
+  isHost: boolean;
+};
+
 function formatHostName(profile: ProfileRow | undefined, creatorId: string | null, activeUserId: string | null) {
   if (creatorId && activeUserId && creatorId === activeUserId) {
     return "You";
@@ -677,6 +684,83 @@ export async function fetchHostedEventInvitees(eventId: string): Promise<{ data:
       .sort((a, b) => a.name.localeCompare(b.name)),
     error: null,
   };
+}
+
+export async function fetchEventAttendees(eventId: string): Promise<{ data: EventAttendee[] | null; error: string | null }> {
+  const { data: event, error: eventError } = await supabase
+    .from("events")
+    .select("creator_id")
+    .eq("id", eventId)
+    .maybeSingle();
+
+  if (eventError) {
+    return { data: null, error: eventError.message };
+  }
+
+  if (!event?.creator_id) {
+    return { data: [], error: null };
+  }
+
+  const { data: inviteRows, error: inviteError } = await supabase
+    .from("event_invites")
+    .select("invitee_id, status")
+    .eq("event_id", eventId);
+
+  if (inviteError) {
+    return { data: null, error: inviteError.message };
+  }
+
+  const acceptedInviteeIds = ((inviteRows ?? []) as Array<{ invitee_id: string; status: string | null }>)
+    .filter((row) => row.status?.toLowerCase() === "accepted")
+    .map((row) => row.invitee_id)
+    .filter((id) => id !== event.creator_id);
+
+  const profileIds = Array.from(new Set([event.creator_id, ...acceptedInviteeIds]));
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select("id, username, first_name, last_name")
+    .in("id", profileIds);
+
+  if (profilesError) {
+    return { data: null, error: profilesError.message };
+  }
+
+  const profileMap = new Map<string, ProfileRow>();
+  for (const profile of (profiles ?? []) as ProfileRow[]) {
+    profileMap.set(profile.id, profile);
+  }
+
+  const hostProfile = profileMap.get(event.creator_id);
+  const attendees: EventAttendee[] = [];
+
+  if (hostProfile) {
+    attendees.push({
+      id: hostProfile.id,
+      username: hostProfile.username?.trim() ?? "",
+      name: fullNameFromProfile(hostProfile),
+      isHost: true,
+    });
+  }
+
+  attendees.push(
+    ...acceptedInviteeIds
+      .map((id) => {
+        const profile = profileMap.get(id);
+        if (!profile) {
+          return null;
+        }
+        return {
+          id: profile.id,
+          username: profile.username?.trim() ?? "",
+          name: fullNameFromProfile(profile),
+          isHost: false,
+        };
+      })
+      .filter((attendee): attendee is EventAttendee => attendee !== null)
+      .sort((a, b) => a.name.localeCompare(b.name))
+  );
+
+  return { data: attendees, error: null };
 }
 
 export async function addHostedEventInvite(eventId: string, usernameInput: string): Promise<{ data: HostedEventInvitee | null; error: string | null }> {

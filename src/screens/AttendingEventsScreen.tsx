@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, View, Text, StyleSheet, ActivityIndicator, RefreshControl, Pressable, Modal } from "react-native";
+import EventAttendeeSection from "../components/EventAttendeeSection";
 import { fetchEventBuckets, leaveEvent, type EventItem } from "../data/eventStore";
 
 export default function AttendingEventsScreen() {
@@ -87,8 +88,9 @@ export default function AttendingEventsScreen() {
           <Text style={styles.eventMeta}>{event.place}</Text>
           <View style={styles.metaFooter}>
             <Text style={styles.metaLabel}>{event.host}</Text>
-              <Text style={styles.metaLabel}>{event.genre}</Text>
+            <Text style={styles.metaLabel}>{event.genre}</Text>
           </View>
+          <EventAttendeeSection eventId={event.id} />
           <View style={styles.actionRow}>
             <Pressable
               style={[styles.secondaryButton, processingEventId === event.id && styles.secondaryButtonDisabled]}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, View, Text, StyleSheet, ActivityIndicator, RefreshControl } from "react-native";
+import EventAttendeeSection from "../components/EventAttendeeSection";
 import { fetchEventBuckets, type EventItem } from "../data/eventStore";
 
 export default function PastEventsScreen() {
@@ -69,6 +70,7 @@ export default function PastEventsScreen() {
             <Text style={styles.metaLabel}>{event.host}</Text>
             <Text style={styles.metaLabel}>{event.genre}</Text>
           </View>
+          <EventAttendeeSection eventId={event.id} />
         </View>
       ))}
     </ScrollView>
