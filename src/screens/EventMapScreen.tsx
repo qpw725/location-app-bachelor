@@ -1,19 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import MapView, { Marker, Region } from "react-native-maps";
-import * as Location from "expo-location";
 import type { RootStackParamList } from "../../App";
 import {
   fetchEventLiveParticipants,
   fetchEventMapDetails,
   hasEventMapCoordinates,
   isEventShareWindowOpen,
-  stopSharingMyEventLocation,
-  upsertMyEventLiveLocation,
   type EventMapDetails,
   type LiveEventParticipant,
 } from "../data/eventLiveLocation";
+import { startEventLocationSharing, stopEventLocationSharing } from "../locationSharingManager";
 import { supabase } from "../supabase";
 
 type Props = NativeStackScreenProps<RootStackParamList, "EventMap">;
@@ -33,7 +31,6 @@ export default function EventMapScreen({ route }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   const [isBusySharing, setIsBusySharing] = useState(false);
-  const locationSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
 
   const loadMap = useCallback(async () => {
     setError(null);
@@ -67,16 +64,10 @@ export default function EventMapScreen({ route }: Props) {
     setLoading(false);
   }, [eventId]);
 
-  const stopLocationWatcher = useCallback(() => {
-    locationSubscriptionRef.current?.remove();
-    locationSubscriptionRef.current = null;
-  }, []);
-
   const handleStopSharing = useCallback(async () => {
-    stopLocationWatcher();
     setIsBusySharing(true);
 
-    const { error: stopError } = await stopSharingMyEventLocation(eventId);
+    const { error: stopError } = await stopEventLocationSharing(eventId);
 
     setIsBusySharing(false);
 
@@ -87,7 +78,7 @@ export default function EventMapScreen({ route }: Props) {
 
     setIsSharing(false);
     await loadMap();
-  }, [eventId, loadMap, stopLocationWatcher]);
+  }, [eventId, loadMap]);
 
   const handleStartSharing = useCallback(async () => {
     if (!eventDetails) {
@@ -102,55 +93,22 @@ export default function EventMapScreen({ route }: Props) {
     setError(null);
     setIsBusySharing(true);
 
-    const permission = await Location.requestForegroundPermissionsAsync();
-    if (!permission.granted) {
-      setIsBusySharing(false);
-      setError("Foreground location permission is required to share your location on the event map.");
-      return;
-    }
-
-    const currentPosition = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
-    });
-
-    const firstUpsert = await upsertMyEventLiveLocation({
+    const startResult = await startEventLocationSharing({
       eventId,
-      latitude: currentPosition.coords.latitude,
-      longitude: currentPosition.coords.longitude,
+      startAt: eventDetails.startAt,
+      endAt: eventDetails.endAt,
     });
 
-    if (firstUpsert.error) {
+    if (startResult.error) {
       setIsBusySharing(false);
-      setError(firstUpsert.error);
+      setError(startResult.error);
       return;
     }
 
-    stopLocationWatcher();
-
-    const subscription = await Location.watchPositionAsync(
-      {
-        accuracy: Location.Accuracy.Balanced,
-        timeInterval: 15000,
-        distanceInterval: 25,
-      },
-      async (nextPosition) => {
-        const { error: updateError } = await upsertMyEventLiveLocation({
-          eventId,
-          latitude: nextPosition.coords.latitude,
-          longitude: nextPosition.coords.longitude,
-        });
-
-        if (updateError) {
-          setError(updateError);
-        }
-      }
-    );
-
-    locationSubscriptionRef.current = subscription;
     setIsSharing(true);
     setIsBusySharing(false);
     await loadMap();
-  }, [eventDetails, eventId, loadMap, stopLocationWatcher]);
+  }, [eventDetails, eventId, loadMap]);
 
   useEffect(() => {
     void loadMap();
@@ -177,15 +135,6 @@ export default function EventMapScreen({ route }: Props) {
       void supabase.removeChannel(channel);
     };
   }, [eventId, loadMap]);
-
-  useEffect(() => {
-    return () => {
-      stopLocationWatcher();
-      if (isSharing) {
-        void stopSharingMyEventLocation(eventId);
-      }
-    };
-  }, [eventId, isSharing, stopLocationWatcher]);
 
   useEffect(() => {
     if (!eventDetails || !isSharing) {
@@ -296,8 +245,8 @@ export default function EventMapScreen({ route }: Props) {
           {shareWindowOpen ? (
             <Text style={styles.shareText}>
               {isSharing
-                ? "Your live location is currently visible to attendees on this map."
-                : "Share your live location so other attendees can see you on the event map."}
+                ? "Your live location is being shared and will keep updating until you stop sharing or the event ends."
+                : "Share your live location so other attendees can see you on the event map, even after you leave this screen."}
             </Text>
           ) : (
             <Text style={styles.shareText}>{shareWindowLabel}</Text>

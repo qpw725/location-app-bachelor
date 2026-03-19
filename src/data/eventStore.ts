@@ -1,4 +1,5 @@
 import { supabase } from "../supabase";
+import { stopEventLocationSharing } from "../locationSharingManager";
 
 type DbEventRow = {
   id: string;
@@ -549,6 +550,7 @@ export async function deleteHostedEvent(eventId: string): Promise<{ error: strin
     return { error: "Event not found or you do not have permission to delete it." };
   }
 
+  await stopEventLocationSharing(eventId);
   return { error: null };
 }
 
@@ -579,14 +581,9 @@ export async function leaveEvent(eventId: string): Promise<{ error: string | nul
     return { error: "Invite not found or you do not have permission to leave this event." };
   }
 
-  const { error: liveLocationError } = await supabase
-    .from("event_live_locations")
-    .delete()
-    .eq("event_id", eventId)
-    .eq("user_id", userId);
-
-  if (liveLocationError) {
-    return { error: liveLocationError.message };
+  const { error: stopShareError } = await stopEventLocationSharing(eventId);
+  if (stopShareError) {
+    return { error: stopShareError };
   }
 
   return { error: null };

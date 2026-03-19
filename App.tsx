@@ -23,6 +23,7 @@ import EventMapScreen from "./src/screens/EventMapScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
 import RegisterProfileScreen from "./src/screens/RegisterProfileScreen";
+import { initializeEventLocationSharing } from "./src/locationSharingManager";
 import { supabase } from "./src/supabase";
 
 
@@ -132,6 +133,14 @@ function MainTabs() {
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+
+    void initializeEventLocationSharing();
+  }, [session]);
 
   useEffect(() => {
     let isMounted = true;
