@@ -59,9 +59,8 @@ export async function fetchCurrentProfile(): Promise<{ profile: CurrentProfile |
   const createdAt = user.created_at ? new Date(user.created_at) : null;
   const memberSince =
     createdAt && !Number.isNaN(createdAt.getTime())
-      ? createdAt.toLocaleDateString([], { month: "short", day: "2-digit", year: "numeric" })
+      ? createdAt.toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" })
       : "Unknown";
-
   const avatarPath = profileRow?.avatar_path?.trim() || null;
 
   return {
