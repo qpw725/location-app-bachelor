@@ -1,10 +1,13 @@
 import { supabase } from "../supabase";
+import { stopEventLocationSharing } from "../locationSharingManager";
 
 type DbEventRow = {
   id: string;
   title: string | null;
   description: string | null;
   location: string | null;
+  latitude: number | null;
+  longitude: number | null;
   start_time: string | null;
   end_time: string | null;
   genre: string | null;
@@ -32,6 +35,8 @@ export type EventItem = {
   description: string;
   time: string;
   place: string;
+  latitude: number | null;
+  longitude: number | null;
   host: string;
   genre: string;
   visibility: "Public" | "Private";
@@ -66,6 +71,13 @@ export type HostedEventInvitee = {
   username: string;
   name: string;
   status: string;
+};
+
+export type EventAttendee = {
+  id: string;
+  username: string;
+  name: string;
+  isHost: boolean;
 };
 
 function formatHostName(profile: ProfileRow | undefined, creatorId: string | null, activeUserId: string | null) {
@@ -103,6 +115,8 @@ function mapEventRow(row: DbEventRow, creatorProfile: ProfileRow | undefined, ac
     description: row.description?.trim() || "No description provided",
     time: formatEventTime(row.start_time, row.end_time),
     place: row.location?.trim() || "Location not set",
+    latitude: row.latitude,
+    longitude: row.longitude,
     host: formatHostName(creatorProfile, row.creator_id, activeUserId),
     genre: row.genre?.trim() || "General",
     visibility: row.private ? "Private" : "Public",
@@ -135,7 +149,7 @@ export async function fetchEventBuckets(): Promise<{ data: EventBuckets | null; 
 
   const { data: publicRows, error: publicError } = await supabase
     .from("events")
-    .select("id, title, description, location, start_time, end_time, genre, private, creator_id")
+    .select("id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id")
     .eq("private", false)
     .order("start_time", { ascending: true });
 
@@ -171,7 +185,7 @@ export async function fetchEventBuckets(): Promise<{ data: EventBuckets | null; 
   if (acceptedInviteEventIds.size > 0) {
     const { data, error } = await supabase
       .from("events")
-      .select("id, title, description, location, start_time, end_time, genre, private, creator_id")
+      .select("id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id")
       .in("id", Array.from(acceptedInviteEventIds))
       .order("start_time", { ascending: true });
 
@@ -186,7 +200,7 @@ export async function fetchEventBuckets(): Promise<{ data: EventBuckets | null; 
   if (userId) {
     const { data, error } = await supabase
       .from("events")
-      .select("id, title, description, location, start_time, end_time, genre, private, creator_id")
+      .select("id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id")
       .eq("creator_id", userId)
       .order("start_time", { ascending: true });
 
@@ -226,6 +240,10 @@ export async function fetchEventBuckets(): Promise<{ data: EventBuckets | null; 
   const invitedUpcoming = mappedInvited.filter((event) => !isPastEvent(event, now));
   const hostedIds = new Set(hostingEvents.map((event) => event.id));
   const attendingEvents = sortAscending(invitedUpcoming.filter((event) => !hostedIds.has(event.id)));
+  const attendingIds = new Set(attendingEvents.map((event) => event.id));
+  const publicEvents = sortAscending(
+    mappedPublic.filter((event) => !hostedIds.has(event.id) && !attendingIds.has(event.id))
+  );
 
   const pastMap = new Map<string, EventItem>();
   for (const event of mappedHosting.concat(mappedInvited)) {
@@ -236,13 +254,57 @@ export async function fetchEventBuckets(): Promise<{ data: EventBuckets | null; 
 
   return {
     data: {
-      publicEvents: sortAscending(mappedPublic),
+      publicEvents,
       attendingEvents,
       hostingEvents,
       pastEvents: sortDescending(Array.from(pastMap.values())),
     },
     error: null,
   };
+}
+
+export async function joinPublicEvent(eventId: string): Promise<{ error: string | null }> {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    return { error: authError.message };
+  }
+
+  const userId = authData.user?.id;
+  if (!userId) {
+    return { error: "Could not identify current user." };
+  }
+
+  const { data: event, error: eventError } = await supabase
+    .from("events")
+    .select("id, private, creator_id")
+    .eq("id", eventId)
+    .maybeSingle();
+
+  if (eventError) {
+    return { error: eventError.message };
+  }
+
+  if (!event) {
+    return { error: "Event not found." };
+  }
+
+  if (event.creator_id === userId) {
+    return { error: null };
+  }
+
+  if (event.private) {
+    return { error: "This event is private and cannot be joined without an invite." };
+  }
+
+  const { error: joinError } = await supabase
+    .from("event_invites")
+    .upsert([{ event_id: eventId, invitee_id: userId, status: "accepted" }], { onConflict: "event_id,invitee_id" });
+
+  if (joinError) {
+    return { error: joinError.message };
+  }
+
+  return { error: null };
 }
 
 export async function fetchHomeOverview(): Promise<{ data: HomeOverview | null; error: string | null }> {
@@ -409,9 +471,9 @@ export async function fetchHomeActivity(): Promise<{ data: HomeActivityItem[] | 
 
   if (pendingEventIds.length > 0) {
     const { data: eventRows, error: eventRowsError } = await supabase
-      .from("events")
-      .select("id, title, description, location, start_time, end_time, genre, private, creator_id")
-      .in("id", pendingEventIds);
+    .from("events")
+    .select("id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id")
+    .in("id", pendingEventIds);
 
     if (eventRowsError) {
       return { data: null, error: eventRowsError.message };
@@ -488,6 +550,7 @@ export async function deleteHostedEvent(eventId: string): Promise<{ error: strin
     return { error: "Event not found or you do not have permission to delete it." };
   }
 
+  await stopEventLocationSharing(eventId);
   return { error: null };
 }
 
@@ -516,6 +579,11 @@ export async function leaveEvent(eventId: string): Promise<{ error: string | nul
 
   if (!data) {
     return { error: "Invite not found or you do not have permission to leave this event." };
+  }
+
+  const { error: stopShareError } = await stopEventLocationSharing(eventId);
+  if (stopShareError) {
+    return { error: stopShareError };
   }
 
   return { error: null };
@@ -629,6 +697,83 @@ export async function fetchHostedEventInvitees(eventId: string): Promise<{ data:
       .sort((a, b) => a.name.localeCompare(b.name)),
     error: null,
   };
+}
+
+export async function fetchEventAttendees(eventId: string): Promise<{ data: EventAttendee[] | null; error: string | null }> {
+  const { data: event, error: eventError } = await supabase
+    .from("events")
+    .select("creator_id")
+    .eq("id", eventId)
+    .maybeSingle();
+
+  if (eventError) {
+    return { data: null, error: eventError.message };
+  }
+
+  if (!event?.creator_id) {
+    return { data: [], error: null };
+  }
+
+  const { data: inviteRows, error: inviteError } = await supabase
+    .from("event_invites")
+    .select("invitee_id, status")
+    .eq("event_id", eventId);
+
+  if (inviteError) {
+    return { data: null, error: inviteError.message };
+  }
+
+  const acceptedInviteeIds = ((inviteRows ?? []) as Array<{ invitee_id: string; status: string | null }>)
+    .filter((row) => row.status?.toLowerCase() === "accepted")
+    .map((row) => row.invitee_id)
+    .filter((id) => id !== event.creator_id);
+
+  const profileIds = Array.from(new Set([event.creator_id, ...acceptedInviteeIds]));
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select("id, username, first_name, last_name")
+    .in("id", profileIds);
+
+  if (profilesError) {
+    return { data: null, error: profilesError.message };
+  }
+
+  const profileMap = new Map<string, ProfileRow>();
+  for (const profile of (profiles ?? []) as ProfileRow[]) {
+    profileMap.set(profile.id, profile);
+  }
+
+  const hostProfile = profileMap.get(event.creator_id);
+  const attendees: EventAttendee[] = [];
+
+  if (hostProfile) {
+    attendees.push({
+      id: hostProfile.id,
+      username: hostProfile.username?.trim() ?? "",
+      name: fullNameFromProfile(hostProfile),
+      isHost: true,
+    });
+  }
+
+  attendees.push(
+    ...acceptedInviteeIds
+      .map((id) => {
+        const profile = profileMap.get(id);
+        if (!profile) {
+          return null;
+        }
+        return {
+          id: profile.id,
+          username: profile.username?.trim() ?? "",
+          name: fullNameFromProfile(profile),
+          isHost: false,
+        };
+      })
+      .filter((attendee): attendee is EventAttendee => attendee !== null)
+      .sort((a, b) => a.name.localeCompare(b.name))
+  );
+
+  return { data: attendees, error: null };
 }
 
 export async function addHostedEventInvite(eventId: string, usernameInput: string): Promise<{ data: HostedEventInvitee | null; error: string | null }> {
