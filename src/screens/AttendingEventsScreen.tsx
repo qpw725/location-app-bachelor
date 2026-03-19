@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, View, Text, StyleSheet, ActivityIndicator, RefreshControl, Pressable, Modal } from "react-native";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import EventAttendeeSection from "../components/EventAttendeeSection";
 import { fetchEventBuckets, leaveEvent, type EventItem } from "../data/eventStore";
+import type { RootStackParamList } from "../../App";
 
-export default function AttendingEventsScreen() {
+type Props = NativeStackScreenProps<RootStackParamList, "AttendingEvents">;
+
+export default function AttendingEventsScreen({ navigation }: Props) {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -92,6 +96,12 @@ export default function AttendingEventsScreen() {
           </View>
           <EventAttendeeSection eventId={event.id} />
           <View style={styles.actionRow}>
+            <Pressable
+              style={styles.mapButton}
+              onPress={() => navigation.navigate("EventMap", { eventId: event.id, eventTitle: event.title })}
+            >
+              <Text style={styles.mapButtonText}>Map</Text>
+            </Pressable>
             <Pressable
               style={[styles.secondaryButton, processingEventId === event.id && styles.secondaryButtonDisabled]}
               onPress={() => {
@@ -213,6 +223,20 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: "#edf1f8",
+    flexDirection: "row",
+    gap: 10,
+  },
+  mapButton: {
+    alignSelf: "flex-start",
+    backgroundColor: "#1f4fa3",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  mapButtonText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "700",
   },
   secondaryButton: {
     alignSelf: "flex-start",

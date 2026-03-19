@@ -207,14 +207,16 @@ export default function EventOverviewScreen({ route, navigation }: Props) {
     const { data: createdEvent, error } = await supabase
       .from("events")
       .insert({
-      creator_id: userData.user.id,
-      title: eventName.trim(),
-      description: eventDescription?.trim() ? eventDescription.trim() : null,
-      location: location.label,
-      start_time: startDate.toISOString(),
-      end_time: endDate.toISOString(),
-      genre: selectedCategory,
-      private: visibility === "Private",
+        creator_id: userData.user.id,
+        title: eventName.trim(),
+        description: eventDescription?.trim() ? eventDescription.trim() : null,
+        location: location.label,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        start_time: startDate.toISOString(),
+        end_time: endDate.toISOString(),
+        genre: selectedCategory,
+        private: visibility === "Private",
       })
       .select("id")
       .single();

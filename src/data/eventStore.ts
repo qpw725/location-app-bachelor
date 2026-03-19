@@ -5,6 +5,8 @@ type DbEventRow = {
   title: string | null;
   description: string | null;
   location: string | null;
+  latitude: number | null;
+  longitude: number | null;
   start_time: string | null;
   end_time: string | null;
   genre: string | null;
@@ -32,6 +34,8 @@ export type EventItem = {
   description: string;
   time: string;
   place: string;
+  latitude: number | null;
+  longitude: number | null;
   host: string;
   genre: string;
   visibility: "Public" | "Private";
@@ -110,6 +114,8 @@ function mapEventRow(row: DbEventRow, creatorProfile: ProfileRow | undefined, ac
     description: row.description?.trim() || "No description provided",
     time: formatEventTime(row.start_time, row.end_time),
     place: row.location?.trim() || "Location not set",
+    latitude: row.latitude,
+    longitude: row.longitude,
     host: formatHostName(creatorProfile, row.creator_id, activeUserId),
     genre: row.genre?.trim() || "General",
     visibility: row.private ? "Private" : "Public",
@@ -142,7 +148,7 @@ export async function fetchEventBuckets(): Promise<{ data: EventBuckets | null; 
 
   const { data: publicRows, error: publicError } = await supabase
     .from("events")
-    .select("id, title, description, location, start_time, end_time, genre, private, creator_id")
+    .select("id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id")
     .eq("private", false)
     .order("start_time", { ascending: true });
 
@@ -178,7 +184,7 @@ export async function fetchEventBuckets(): Promise<{ data: EventBuckets | null; 
   if (acceptedInviteEventIds.size > 0) {
     const { data, error } = await supabase
       .from("events")
-      .select("id, title, description, location, start_time, end_time, genre, private, creator_id")
+      .select("id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id")
       .in("id", Array.from(acceptedInviteEventIds))
       .order("start_time", { ascending: true });
 
@@ -193,7 +199,7 @@ export async function fetchEventBuckets(): Promise<{ data: EventBuckets | null; 
   if (userId) {
     const { data, error } = await supabase
       .from("events")
-      .select("id, title, description, location, start_time, end_time, genre, private, creator_id")
+      .select("id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id")
       .eq("creator_id", userId)
       .order("start_time", { ascending: true });
 
@@ -464,9 +470,9 @@ export async function fetchHomeActivity(): Promise<{ data: HomeActivityItem[] | 
 
   if (pendingEventIds.length > 0) {
     const { data: eventRows, error: eventRowsError } = await supabase
-      .from("events")
-      .select("id, title, description, location, start_time, end_time, genre, private, creator_id")
-      .in("id", pendingEventIds);
+    .from("events")
+    .select("id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id")
+    .in("id", pendingEventIds);
 
     if (eventRowsError) {
       return { data: null, error: eventRowsError.message };
@@ -571,6 +577,16 @@ export async function leaveEvent(eventId: string): Promise<{ error: string | nul
 
   if (!data) {
     return { error: "Invite not found or you do not have permission to leave this event." };
+  }
+
+  const { error: liveLocationError } = await supabase
+    .from("event_live_locations")
+    .delete()
+    .eq("event_id", eventId)
+    .eq("user_id", userId);
+
+  if (liveLocationError) {
+    return { error: liveLocationError.message };
   }
 
   return { error: null };

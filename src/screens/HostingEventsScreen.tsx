@@ -23,6 +23,8 @@ import {
   updateHostedEvent,
 } from "../data/eventStore";
 import EventAttendeeSection from "../components/EventAttendeeSection";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import type { RootStackParamList } from "../../App";
 
 type EditDraft = {
   eventId: string;
@@ -34,7 +36,9 @@ type EditDraft = {
   endAt: Date;
 };
 
-export default function HostingEventsScreen() {
+type Props = NativeStackScreenProps<RootStackParamList, "HostingEvents">;
+
+export default function HostingEventsScreen({ navigation }: Props) {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -274,6 +278,13 @@ export default function HostingEventsScreen() {
           </View>
           <EventAttendeeSection eventId={event.id} />
           <View style={styles.actionRow}>
+            <Pressable
+              style={styles.mapButton}
+              onPress={() => navigation.navigate("EventMap", { eventId: event.id, eventTitle: event.title })}
+              disabled={processingEventId !== null}
+            >
+              <Text style={styles.mapButtonText}>Map</Text>
+            </Pressable>
             <Pressable
               style={[styles.secondaryButton, processingEventId !== null && styles.secondaryButtonDisabled]}
               onPress={() => openEditModal(event)}
@@ -580,6 +591,18 @@ const styles = StyleSheet.create({
     borderTopColor: "#edf1f8",
     flexDirection: "row",
     gap: 10,
+  },
+  mapButton: {
+    alignSelf: "flex-start",
+    backgroundColor: "#1f4fa3",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  mapButtonText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "700",
   },
   secondaryButton: {
     alignSelf: "flex-start",
