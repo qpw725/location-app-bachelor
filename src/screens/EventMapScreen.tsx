@@ -246,7 +246,7 @@ export default function EventMapScreen({ route }: Props) {
             <Text style={styles.shareText}>
               {isSharing
                 ? "Your live location is being shared and will keep updating until you stop sharing or the event ends."
-                : "Share your live location so other attendees can see you on the event map, even after you leave this screen."}
+                : "Share your live location so other attendees can see you on the event map."}
             </Text>
           ) : (
             <Text style={styles.shareText}>{shareWindowLabel}</Text>

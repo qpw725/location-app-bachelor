@@ -22,6 +22,8 @@ type BackgroundLocationTaskPayload = {
 };
 
 let initializePromise: Promise<void> | null = null;
+let foregroundLocationSubscription: Location.LocationSubscription | null = null;
+let pruneTimer: ReturnType<typeof setInterval> | null = null;
 
 function getEventEndMs(share: ActiveEventShare) {
   const fallback = share.startAtIso ? new Date(share.startAtIso).getTime() : NaN;
@@ -53,6 +55,20 @@ async function stopBackgroundLocationUpdatesIfIdle(shares: ActiveEventShare[]) {
   }
 }
 
+async function stopForegroundLocationUpdatesIfIdle(shares: ActiveEventShare[]) {
+  if (shares.length > 0) {
+    return;
+  }
+
+  foregroundLocationSubscription?.remove();
+  foregroundLocationSubscription = null;
+
+  if (pruneTimer) {
+    clearInterval(pruneTimer);
+    pruneTimer = null;
+  }
+}
+
 async function pruneExpiredShares() {
   const currentShares = await loadActiveShares();
   const activeShares = currentShares.filter((share) => isShareActive(share));
@@ -72,6 +88,7 @@ async function pruneExpiredShares() {
   }
 
   await stopBackgroundLocationUpdatesIfIdle(activeShares);
+  await stopForegroundLocationUpdatesIfIdle(activeShares);
   return activeShares;
 }
 
@@ -116,6 +133,57 @@ async function ensureBackgroundLocationUpdatesRunning() {
   });
 }
 
+async function ensureForegroundLocationUpdatesRunning() {
+  const activeShares = await pruneExpiredShares();
+  if (activeShares.length === 0 || foregroundLocationSubscription) {
+    return;
+  }
+
+  const foregroundPermission = await Location.getForegroundPermissionsAsync();
+  if (!foregroundPermission.granted) {
+    return;
+  }
+
+  foregroundLocationSubscription = await Location.watchPositionAsync(
+    {
+      accuracy: Location.Accuracy.Balanced,
+      timeInterval: 15000,
+      distanceInterval: 25,
+    },
+    (position) => {
+      void broadcastLocation(position.coords.latitude, position.coords.longitude);
+    }
+  );
+
+  if (!pruneTimer) {
+    pruneTimer = setInterval(() => {
+      void pruneExpiredShares();
+    }, 60000);
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
+  return Promise.race<T | null>([
+    promise,
+    new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), timeoutMs);
+    }),
+  ]);
+}
+
+async function enableBackgroundLocationBestEffort() {
+  try {
+    const backgroundPermission = await withTimeout(Location.requestBackgroundPermissionsAsync(), 5000);
+    if (!backgroundPermission?.granted) {
+      return;
+    }
+
+    await withTimeout(ensureBackgroundLocationUpdatesRunning(), 5000);
+  } catch (error) {
+    console.warn("[LocationSharing] Background mode unavailable, continuing with foreground tracking:", error);
+  }
+}
+
 if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
   TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
     if (error) {
@@ -142,7 +210,8 @@ export async function initializeEventLocationSharing() {
 
   initializePromise = (async () => {
     await pruneExpiredShares();
-    await ensureBackgroundLocationUpdatesRunning();
+    await ensureForegroundLocationUpdatesRunning();
+    await enableBackgroundLocationBestEffort();
   })();
 
   try {
@@ -162,11 +231,6 @@ export async function startEventLocationSharing(input: {
   const foregroundPermission = await Location.requestForegroundPermissionsAsync();
   if (!foregroundPermission.granted) {
     return { error: "Foreground location permission is required to share your location on the event map." };
-  }
-
-  const backgroundPermission = await Location.requestBackgroundPermissionsAsync();
-  if (!backgroundPermission.granted) {
-    return { error: "Background location permission is required to keep sharing after you leave the map screen." };
   }
 
   const currentShares = await loadActiveShares();
@@ -193,7 +257,8 @@ export async function startEventLocationSharing(input: {
     return { error: firstUpsertError };
   }
 
-  await ensureBackgroundLocationUpdatesRunning();
+  await ensureForegroundLocationUpdatesRunning();
+  void enableBackgroundLocationBestEffort();
 
   return { error: null };
 }
@@ -205,6 +270,7 @@ export async function stopEventLocationSharing(eventId: string) {
   const nextShares = currentShares.filter((share) => share.eventId !== eventId);
   await saveActiveShares(nextShares);
   await stopBackgroundLocationUpdatesIfIdle(nextShares);
+  await stopForegroundLocationUpdatesIfIdle(nextShares);
 
   return stopSharingMyEventLocation(eventId);
 }
