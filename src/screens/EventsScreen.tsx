@@ -14,7 +14,7 @@ import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { CompositeScreenProps, useFocusEffect } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainTabParamList, RootStackParamList } from "../../App";
-import { fetchEventBuckets, type EventItem } from "../data/eventStore";
+import { fetchEventBuckets, joinPublicEvent, type EventItem } from "../data/eventStore";
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, "Events">,
@@ -41,7 +41,19 @@ function MyEventPreviewCard({ title, description, time, place, host, genre, visi
   );
 }
 
-function DiscoverEventCard({ title, description, time, place, host, genre }: EventItem) {
+function DiscoverEventCard({
+  title,
+  description,
+  time,
+  place,
+  host,
+  genre,
+  onJoin,
+  joining,
+}: EventItem & {
+  onJoin: () => void;
+  joining: boolean;
+}) {
   return (
     <View style={styles.discoverCard}>
       <Text style={styles.eventTitle}>{title}</Text>
@@ -51,6 +63,15 @@ function DiscoverEventCard({ title, description, time, place, host, genre }: Eve
       <View style={styles.discoverFooter}>
         <Text style={styles.discoverHost}>{host}</Text>
         <Text style={styles.discoverVibe}>{genre}</Text>
+      </View>
+      <View style={styles.discoverActionRow}>
+        <Pressable
+          style={[styles.joinButton, joining && styles.joinButtonDisabled]}
+          onPress={onJoin}
+          disabled={joining}
+        >
+          <Text style={styles.joinButtonText}>{joining ? "Joining..." : "Join event"}</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -101,6 +122,7 @@ export default function EventsScreen({ navigation }: Props) {
   const [invitedEvents, setInvitedEvents] = useState<EventItem[]>([]);
   const [hostingEvents, setHostingEvents] = useState<EventItem[]>([]);
   const [pastEvents, setPastEvents] = useState<EventItem[]>([]);
+  const [joiningEventId, setJoiningEventId] = useState<string | null>(null);
 
   const categoryOptions = useMemo(() => {
     const seeded = [
@@ -201,6 +223,23 @@ export default function EventsScreen({ navigation }: Props) {
     await loadEvents();
     setRefreshing(false);
   }, [loadEvents]);
+
+  const handleJoinEvent = useCallback(
+    async (eventId: string) => {
+      setEventsError(null);
+      setJoiningEventId(eventId);
+      const { error } = await joinPublicEvent(eventId);
+      if (error) {
+        setEventsError(error);
+        setJoiningEventId(null);
+        return;
+      }
+
+      await loadEvents();
+      setJoiningEventId(null);
+    },
+    [loadEvents]
+  );
 
   function toggleCategory(category: string) {
     setSelectedCategories((prev) =>
@@ -365,7 +404,14 @@ export default function EventsScreen({ navigation }: Props) {
 
           <Text style={styles.sectionTitle}>Discover public events</Text>
           {discoverList.map((event) => (
-            <DiscoverEventCard key={event.id} {...event} />
+            <DiscoverEventCard
+              key={event.id}
+              {...event}
+              joining={joiningEventId === event.id}
+              onJoin={() => {
+                void handleJoinEvent(event.id);
+              }}
+            />
           ))}
           {discoverList.length === 0 && (
             <View style={styles.discoverCard}>
@@ -543,6 +589,27 @@ const styles = StyleSheet.create({
   },
   discoverHost: { fontSize: 12, color: "#3f4e68", fontWeight: "600" },
   discoverVibe: { fontSize: 12, color: "#5d6a80" },
+  discoverActionRow: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#edf1f8",
+    alignItems: "flex-start",
+  },
+  joinButton: {
+    backgroundColor: "#1f4fa3",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  joinButtonDisabled: {
+    opacity: 0.6,
+  },
+  joinButtonText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
   stateCard: {
     backgroundColor: "#ffffff",
     borderRadius: 12,

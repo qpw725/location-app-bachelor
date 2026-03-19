@@ -71,7 +71,7 @@ export default function AttendingEventsScreen() {
       {!loading && !error && events.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyTitle}>No attending events yet</Text>
-          <Text style={styles.emptyText}>Accepted and pending invites will show up here.</Text>
+          <Text style={styles.emptyText}>Accepted invites and joined public events will show up here.</Text>
         </View>
       ) : null}
       {events.map((event) => (

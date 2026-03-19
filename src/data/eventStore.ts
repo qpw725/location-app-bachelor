@@ -226,6 +226,10 @@ export async function fetchEventBuckets(): Promise<{ data: EventBuckets | null; 
   const invitedUpcoming = mappedInvited.filter((event) => !isPastEvent(event, now));
   const hostedIds = new Set(hostingEvents.map((event) => event.id));
   const attendingEvents = sortAscending(invitedUpcoming.filter((event) => !hostedIds.has(event.id)));
+  const attendingIds = new Set(attendingEvents.map((event) => event.id));
+  const publicEvents = sortAscending(
+    mappedPublic.filter((event) => !hostedIds.has(event.id) && !attendingIds.has(event.id))
+  );
 
   const pastMap = new Map<string, EventItem>();
   for (const event of mappedHosting.concat(mappedInvited)) {
@@ -236,13 +240,57 @@ export async function fetchEventBuckets(): Promise<{ data: EventBuckets | null; 
 
   return {
     data: {
-      publicEvents: sortAscending(mappedPublic),
+      publicEvents,
       attendingEvents,
       hostingEvents,
       pastEvents: sortDescending(Array.from(pastMap.values())),
     },
     error: null,
   };
+}
+
+export async function joinPublicEvent(eventId: string): Promise<{ error: string | null }> {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    return { error: authError.message };
+  }
+
+  const userId = authData.user?.id;
+  if (!userId) {
+    return { error: "Could not identify current user." };
+  }
+
+  const { data: event, error: eventError } = await supabase
+    .from("events")
+    .select("id, private, creator_id")
+    .eq("id", eventId)
+    .maybeSingle();
+
+  if (eventError) {
+    return { error: eventError.message };
+  }
+
+  if (!event) {
+    return { error: "Event not found." };
+  }
+
+  if (event.creator_id === userId) {
+    return { error: null };
+  }
+
+  if (event.private) {
+    return { error: "This event is private and cannot be joined without an invite." };
+  }
+
+  const { error: joinError } = await supabase
+    .from("event_invites")
+    .upsert([{ event_id: eventId, invitee_id: userId, status: "accepted" }], { onConflict: "event_id,invitee_id" });
+
+  if (joinError) {
+    return { error: joinError.message };
+  }
+
+  return { error: null };
 }
 
 export async function fetchHomeOverview(): Promise<{ data: HomeOverview | null; error: string | null }> {
