@@ -1,24 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
-import * as TaskManager from "expo-task-manager";
 import { stopSharingMyEventLocation, upsertMyEventLiveLocation } from "./data/eventLiveLocation";
 
 const STORAGE_KEY = "active_event_location_shares";
-const BACKGROUND_LOCATION_TASK = "event-live-location-background-task";
 
 type ActiveEventShare = {
   eventId: string;
   startAtIso: string | null;
   endAtIso: string | null;
-};
-
-type BackgroundLocationTaskPayload = {
-  locations?: Array<{
-    coords: {
-      latitude: number;
-      longitude: number;
-    };
-  }>;
 };
 
 let initializePromise: Promise<void> | null = null;
@@ -42,17 +31,6 @@ async function loadActiveShares() {
 
 async function saveActiveShares(shares: ActiveEventShare[]) {
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(shares));
-}
-
-async function stopBackgroundLocationUpdatesIfIdle(shares: ActiveEventShare[]) {
-  if (shares.length > 0) {
-    return;
-  }
-
-  const hasStarted = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
-  if (hasStarted) {
-    await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
-  }
 }
 
 async function stopForegroundLocationUpdatesIfIdle(shares: ActiveEventShare[]) {
@@ -87,7 +65,6 @@ async function pruneExpiredShares() {
     }
   }
 
-  await stopBackgroundLocationUpdatesIfIdle(activeShares);
   await stopForegroundLocationUpdatesIfIdle(activeShares);
   return activeShares;
 }
@@ -106,31 +83,6 @@ async function broadcastLocation(latitude: number, longitude: number) {
       console.warn(`[LocationSharing] Failed to update ${share.eventId}:`, error);
     }
   }
-}
-
-async function ensureBackgroundLocationUpdatesRunning() {
-  const activeShares = await pruneExpiredShares();
-  if (activeShares.length === 0) {
-    return;
-  }
-
-  const hasStarted = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
-  if (hasStarted) {
-    return;
-  }
-
-  await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
-    accuracy: Location.Accuracy.Balanced,
-    timeInterval: 15000,
-    distanceInterval: 25,
-    pausesUpdatesAutomatically: false,
-    showsBackgroundLocationIndicator: true,
-    foregroundService: {
-      notificationTitle: "Event location sharing is active",
-      notificationBody: "Your location is being shared for an active event until you stop it or the event ends.",
-      notificationColor: "#1f4fa3",
-    },
-  });
 }
 
 async function ensureForegroundLocationUpdatesRunning() {
@@ -162,47 +114,6 @@ async function ensureForegroundLocationUpdatesRunning() {
   }
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
-  return Promise.race<T | null>([
-    promise,
-    new Promise<null>((resolve) => {
-      setTimeout(() => resolve(null), timeoutMs);
-    }),
-  ]);
-}
-
-async function enableBackgroundLocationBestEffort() {
-  try {
-    const backgroundPermission = await withTimeout(Location.requestBackgroundPermissionsAsync(), 5000);
-    if (!backgroundPermission?.granted) {
-      return;
-    }
-
-    await withTimeout(ensureBackgroundLocationUpdatesRunning(), 5000);
-  } catch (error) {
-    console.warn("[LocationSharing] Background mode unavailable, continuing with foreground tracking:", error);
-  }
-}
-
-if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
-  TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
-    if (error) {
-      console.warn("[LocationSharing] Background location task error:", error.message);
-      return;
-    }
-
-    const payload = data as BackgroundLocationTaskPayload | undefined;
-    const latestLocation = payload?.locations?.[payload.locations.length - 1];
-
-    if (!latestLocation) {
-      await pruneExpiredShares();
-      return;
-    }
-
-    await broadcastLocation(latestLocation.coords.latitude, latestLocation.coords.longitude);
-  });
-}
-
 export async function initializeEventLocationSharing() {
   if (initializePromise) {
     return initializePromise;
@@ -211,7 +122,6 @@ export async function initializeEventLocationSharing() {
   initializePromise = (async () => {
     await pruneExpiredShares();
     await ensureForegroundLocationUpdatesRunning();
-    await enableBackgroundLocationBestEffort();
   })();
 
   try {
@@ -258,7 +168,6 @@ export async function startEventLocationSharing(input: {
   }
 
   await ensureForegroundLocationUpdatesRunning();
-  void enableBackgroundLocationBestEffort();
 
   return { error: null };
 }
@@ -269,7 +178,6 @@ export async function stopEventLocationSharing(eventId: string) {
   const currentShares = await loadActiveShares();
   const nextShares = currentShares.filter((share) => share.eventId !== eventId);
   await saveActiveShares(nextShares);
-  await stopBackgroundLocationUpdatesIfIdle(nextShares);
   await stopForegroundLocationUpdatesIfIdle(nextShares);
 
   return stopSharingMyEventLocation(eventId);
