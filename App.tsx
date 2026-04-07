@@ -3,7 +3,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { NavigatorScreenParams } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { Session } from "@supabase/supabase-js";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
@@ -120,6 +120,13 @@ function MainTabs() {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
+        tabBarActiveTintColor: "#2f6fed",
+        tabBarInactiveTintColor: "#8a94a6",
+        tabBarLabelStyle: styles.tabBarLabel,
+        tabBarIconStyle: styles.tabBarIcon,
+        tabBarItemStyle: styles.tabBarItem,
+        tabBarStyle: styles.tabBar,
+        headerShadowVisible: false,
       })}
     >
       <Tab.Screen name="Start" component={StartScreen} options={{ title: "Home", headerTitle: "Home" }} />
@@ -250,3 +257,39 @@ export default function App() {
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    position: "absolute",
+    left: "6%",
+    right: "6%",
+    bottom: 24,
+    height: 74,
+    borderTopWidth: 0,
+    borderRadius: 34,
+    backgroundColor: "#fdfdfd",
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === "ios" ? 10 : 12,
+    elevation: 10,
+    shadowColor: "#0f172a",
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+  },
+  tabBarItem: {
+    borderRadius: 24,
+    marginHorizontal: 4,
+    paddingVertical: 4,
+  },
+  tabBarIcon: {
+    marginBottom: 2,
+  },
+  tabBarLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+});
