@@ -1,5 +1,6 @@
 import { supabase } from "../supabase";
 import { stopEventLocationSharing } from "../locationSharingManager";
+import { getAvatarPublicUrl } from "../profile";
 
 type DbEventRow = {
   id: string;
@@ -20,6 +21,7 @@ type ProfileRow = {
   username: string | null;
   first_name: string | null;
   last_name: string | null;
+  avatar_path?: string | null;
 };
 
 function fullNameFromProfile(profile: ProfileRow) {
@@ -27,6 +29,11 @@ function fullNameFromProfile(profile: ProfileRow) {
   const last = profile.last_name?.trim() ?? "";
   const fullName = `${first} ${last}`.trim();
   return fullName || profile.username?.trim() || "Unknown user";
+}
+
+function avatarUrlFromProfile(profile: ProfileRow) {
+  const avatarPath = profile.avatar_path?.trim() ?? "";
+  return avatarPath ? getAvatarPublicUrl(avatarPath) : null;
 }
 
 export type EventItem = {
@@ -77,6 +84,7 @@ export type EventAttendee = {
   id: string;
   username: string;
   name: string;
+  avatarUrl: string | null;
   isHost: boolean;
 };
 
@@ -242,7 +250,7 @@ export async function fetchEventBuckets(): Promise<{ data: EventBuckets | null; 
   const attendingEvents = sortAscending(invitedUpcoming.filter((event) => !hostedIds.has(event.id)));
   const attendingIds = new Set(attendingEvents.map((event) => event.id));
   const publicEvents = sortAscending(
-    mappedPublic.filter((event) => !hostedIds.has(event.id) && !attendingIds.has(event.id))
+    mappedPublic.filter((event) => !isPastEvent(event, now) && !hostedIds.has(event.id) && !attendingIds.has(event.id))
   );
 
   const pastMap = new Map<string, EventItem>();
@@ -276,7 +284,7 @@ export async function joinPublicEvent(eventId: string): Promise<{ error: string 
 
   const { data: event, error: eventError } = await supabase
     .from("events")
-    .select("id, private, creator_id")
+    .select("id, private, creator_id, start_time, end_time")
     .eq("id", eventId)
     .maybeSingle();
 
@@ -294,6 +302,11 @@ export async function joinPublicEvent(eventId: string): Promise<{ error: string 
 
   if (event.private) {
     return { error: "This event is private and cannot be joined without an invite." };
+  }
+
+  const eventEndTime = event.end_time ? new Date(event.end_time).getTime() : event.start_time ? new Date(event.start_time).getTime() : NaN;
+  if (!Number.isNaN(eventEndTime) && eventEndTime < Date.now()) {
+    return { error: "This event has already ended." };
   }
 
   const { error: joinError } = await supabase
@@ -731,7 +744,7 @@ export async function fetchEventAttendees(eventId: string): Promise<{ data: Even
   const profileIds = Array.from(new Set([event.creator_id, ...acceptedInviteeIds]));
   const { data: profiles, error: profilesError } = await supabase
     .from("profiles")
-    .select("id, username, first_name, last_name")
+    .select("id, username, first_name, last_name, avatar_path")
     .in("id", profileIds);
 
   if (profilesError) {
@@ -751,6 +764,7 @@ export async function fetchEventAttendees(eventId: string): Promise<{ data: Even
       id: hostProfile.id,
       username: hostProfile.username?.trim() ?? "",
       name: fullNameFromProfile(hostProfile),
+      avatarUrl: avatarUrlFromProfile(hostProfile),
       isHost: true,
     });
   }
@@ -766,6 +780,7 @@ export async function fetchEventAttendees(eventId: string): Promise<{ data: Even
           id: profile.id,
           username: profile.username?.trim() ?? "",
           name: fullNameFromProfile(profile),
+          avatarUrl: avatarUrlFromProfile(profile),
           isHost: false,
         };
       })

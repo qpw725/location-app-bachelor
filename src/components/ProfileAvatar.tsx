@@ -18,6 +18,7 @@ export default function ProfileAvatar({
   isUploading = false,
 }: Props) {
   const circleRadius = size / 2;
+  const safeAvatarUrl = avatarUrl?.trim() ? avatarUrl : null;
   const avatarStyles = [
     styles.avatar,
     {
@@ -30,8 +31,8 @@ export default function ProfileAvatar({
   const content = (
     <View style={avatarStyles}>
       <View style={[styles.innerCircle, { borderRadius: circleRadius }]}>
-        {avatarUrl ? (
-          <Image source={{ uri: avatarUrl }} style={styles.image} resizeMode="cover" />
+        {safeAvatarUrl ? (
+          <Image source={{ uri: safeAvatarUrl }} style={styles.image} resizeMode="cover" />
         ) : (
           <View style={styles.initialsFill}>
             <Text style={[styles.avatarText, { fontSize: size * 0.36 }]}>{initials}</Text>
