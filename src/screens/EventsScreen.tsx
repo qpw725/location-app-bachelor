@@ -98,7 +98,6 @@ function CategoryCard({
           <Text style={styles.categoryLabel}>{label}</Text>
           <Text style={styles.categoryCount}>{count} events</Text>
         </View>
-        <Text style={styles.categoryArrow}>{">"}</Text>
       </View>
 
       {preview ? (
@@ -545,8 +544,7 @@ const styles = StyleSheet.create({
   },
   categoryLabel: { fontSize: 18, fontWeight: "700", color: "#201c19" },
   categoryCount: { marginTop: 2, fontSize: 13, color: "#6f6258" },
-  categoryArrow: { fontSize: 24, color: "#9d5c2f" },
-  previewWrap: { marginTop: 10, opacity: 0.48 },
+  previewWrap: { marginTop: 10 },
   emptyPreview: { marginTop: 10, fontSize: 13, color: "#8a7f74" },
   pressed: { opacity: 0.88 },
   previewEventCard: {

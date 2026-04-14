@@ -775,7 +775,6 @@ export default function InboxScreen() {
                 <Text style={styles.friendName}>{friend.name}</Text>
                 <Text style={styles.friendUsername}>@{friend.username}</Text>
               </View>
-              <Text style={styles.friendArrow}>{">"}</Text>
             </Pressable>
           ))
         )}
@@ -959,7 +958,6 @@ const styles = StyleSheet.create({
   },
   friendTextWrap: { flex: 1 },
   friendUsername: { fontSize: 12, color: "#6f6258", marginTop: 2 },
-  friendArrow: { fontSize: 22, color: "#9d5c2f", marginLeft: 8 },
   emptyCard: {
     backgroundColor: "#fffaf4",
     borderRadius: 18,

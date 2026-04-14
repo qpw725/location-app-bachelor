@@ -187,14 +187,12 @@ export default function MyProfileScreen({ navigation }: Props) {
           onPress={() => navigation.navigate("NotificationSettings")}
         >
           <Text style={styles.settingsText}>Notifications</Text>
-          <Text style={styles.rowArrow}>{">"}</Text>
         </Pressable>
         <Pressable
           style={({ pressed }) => [styles.settingsRow, styles.infoSpacing, pressed && styles.pressed]}
           onPress={handleSignOut}
         >
           <Text style={[styles.settingsText, styles.signOutText]}>Log off</Text>
-          <Text style={[styles.rowArrow, styles.signOutText]}>{">"}</Text>
         </Pressable>
       </View>
 
@@ -323,11 +321,6 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 16,
     fontWeight: "800",
-  },
-  rowArrow: {
-    fontSize: 24,
-    color: "#9d5c2f",
-    marginLeft: 12,
   },
   infoSpacing: {
     marginTop: 10,
