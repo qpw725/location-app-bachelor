@@ -131,6 +131,7 @@ export default function MyProfileScreen({ navigation }: Props) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.heroCard}>
+        <Text style={styles.heroEyebrow}>Profile</Text>
         <ProfileAvatar
           avatarUrl={profile.avatarUrl}
           initials={initials}
@@ -206,25 +207,35 @@ export default function MyProfileScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#eef3fb",
+    backgroundColor: "#f7f1e8",
   },
   content: {
-    padding: 18,
-    paddingBottom: 28,
+    padding: 20,
+    paddingBottom: 120,
   },
   heroCard: {
-    backgroundColor: "#1f4fa3",
+    backgroundColor: "#fffaf4",
     borderRadius: 28,
     padding: 22,
     alignItems: "center",
-    shadowColor: "#0c2149",
-    shadowOpacity: 0.16,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 5,
+    borderWidth: 1,
+    borderColor: "#eadfce",
+    shadowColor: "#7a5c3d",
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 6,
+  },
+  heroEyebrow: {
+    alignSelf: "flex-start",
+    color: "#8a6a4a",
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 1,
+    marginBottom: 12,
   },
   avatarHint: {
-    color: "#d7e4ff",
+    color: "#6f6258",
     marginTop: 10,
     fontSize: 13,
     fontWeight: "600",
@@ -232,12 +243,12 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#ffffff",
+    color: "#1f1a17",
     textAlign: "center",
   },
   username: {
     fontSize: 16,
-    color: "#d7e4ff",
+    color: "#67594d",
     marginTop: 4,
   },
   heroMetaRow: {
@@ -246,12 +257,14 @@ const styles = StyleSheet.create({
   },
   metaPill: {
     borderRadius: 999,
-    backgroundColor: "#315fb0",
+    backgroundColor: "#f6eee4",
     paddingHorizontal: 14,
     paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "#eadfce",
   },
   metaPillText: {
-    color: "#edf3ff",
+    color: "#5f5145",
     fontSize: 13,
     fontWeight: "700",
   },
@@ -261,20 +274,20 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#1a2233",
+    color: "#201c19",
     marginBottom: 10,
   },
   infoPanel: {
-    borderRadius: 18,
-    backgroundColor: "#ffffff",
+    borderRadius: 22,
+    backgroundColor: "#fffaf4",
     borderWidth: 1,
-    borderColor: "#d9e2f3",
+    borderColor: "#eadfce",
     paddingHorizontal: 16,
     paddingVertical: 16,
-    shadowColor: "#16315f",
+    shadowColor: "#7a5c3d",
     shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
     elevation: 2,
   },
   infoRow: {
@@ -283,7 +296,7 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 13,
-    color: "#66758c",
+    color: "#6f6258",
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 0.5,
@@ -291,23 +304,18 @@ const styles = StyleSheet.create({
   infoValue: {
     marginTop: 5,
     fontSize: 17,
-    color: "#1a2233",
+    color: "#201c19",
     fontWeight: "700",
-  },
-  infoMuted: {
-    marginTop: 5,
-    fontSize: 16,
-    color: "#66758c",
   },
   infoDivider: {
     height: 1,
-    backgroundColor: "#e6edf8",
+    backgroundColor: "#efe4d7",
     marginVertical: 12,
   },
   editButton: {
     marginTop: 12,
-    borderRadius: 16,
-    backgroundColor: "#1f4fa3",
+    borderRadius: 18,
+    backgroundColor: "#2f5d50",
     paddingVertical: 15,
     alignItems: "center",
   },
@@ -318,17 +326,17 @@ const styles = StyleSheet.create({
   },
   rowArrow: {
     fontSize: 24,
-    color: "#1f4fa3",
+    color: "#9d5c2f",
     marginLeft: 12,
   },
   infoSpacing: {
     marginTop: 10,
   },
   settingsRow: {
-    borderRadius: 18,
-    backgroundColor: "#ffffff",
+    borderRadius: 22,
+    backgroundColor: "#fffaf4",
     borderWidth: 1,
-    borderColor: "#d9e2f3",
+    borderColor: "#eadfce",
     paddingHorizontal: 16,
     paddingVertical: 16,
     flexDirection: "row",
@@ -336,7 +344,7 @@ const styles = StyleSheet.create({
   },
   settingsText: {
     fontSize: 17,
-    color: "#1a2233",
+    color: "#201c19",
     fontWeight: "700",
     flex: 1,
   },
@@ -349,11 +357,19 @@ const styles = StyleSheet.create({
   helperText: {
     marginTop: 14,
     fontSize: 14,
-    color: "#2f7d32",
+    color: "#2f5d50",
+    backgroundColor: "#eef3e8",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   errorText: {
     marginTop: 14,
     fontSize: 14,
     color: "#c53535",
+    backgroundColor: "#fff4f1",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
 });

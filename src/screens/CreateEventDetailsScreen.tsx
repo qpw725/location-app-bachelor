@@ -3,14 +3,11 @@ import {
   View,
   Text,
   TextInput,
-  Button,
   StyleSheet,
   Pressable,
   Platform,
   KeyboardAvoidingView,
   ScrollView,
-  TouchableWithoutFeedback,
-  Keyboard,
 } from "react-native";
 import { useState } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -117,20 +114,29 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
   }
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       >
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <StepIndicator step={1} total={3} label="Create event" />
-          <Text style={styles.title}>Create event and time</Text>
+        <StepIndicator step={1} total={3} label="Create event" />
+        <View style={styles.heroCard}>
+          <Text style={styles.title}>Set the basics for your event.</Text>
+          <Text style={styles.heroText}>Choose the name, description, date, and timing before you move on to location.</Text>
+        </View>
 
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Details</Text>
           <Text style={styles.label}>Event name</Text>
           <TextInput
             value={eventName}
             onChangeText={setEventName}
-            placeholder="e.g. Pre-drinks at Bens"
+            placeholder="e.g. Pre-drinks at Ben's"
+            placeholderTextColor="#8a7f74"
             style={styles.input}
           />
 
@@ -139,12 +145,15 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
             value={eventDescription}
             onChangeText={setEventDescription}
             placeholder="What is this event about?"
+            placeholderTextColor="#8a7f74"
             style={[styles.input, styles.descriptionInput]}
             multiline
             textAlignVertical="top"
-            blurOnSubmit
-            onSubmitEditing={Keyboard.dismiss}
           />
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Date and time</Text>
 
           <View style={styles.pickerSection}>
             <Text style={styles.label}>Event date</Text>
@@ -234,80 +243,136 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
               </>
             )}
           </View>
+        </View>
 
-          {!hasFutureStartTime ? (
-            <Text style={styles.errorText}>Start time must be in the future.</Text>
-          ) : null}
+        {!hasFutureStartTime ? (
+          <Text style={styles.errorCard}>Start time must be in the future.</Text>
+        ) : null}
 
-          {!hasValidTimeRange ? (
-            <Text style={styles.errorText}>End time must be after start time.</Text>
-          ) : null}
+        {!hasValidTimeRange ? (
+          <Text style={styles.errorCard}>End time must be after start time.</Text>
+        ) : null}
 
-          <View style={styles.spacer} />
+        <View style={styles.spacer} />
 
-          <Button
-            title="Choose location"
-            onPress={() =>
-              navigation.navigate("ChooseLocation", {
-                eventName: eventName.trim(),
-                eventDescription: eventDescription.trim() || undefined,
-                eventDate: {
-                  year: eventDate.getFullYear(),
-                  month: eventDate.getMonth() + 1,
-                  day: eventDate.getDate(),
-                },
-                eventTime: {
-                  hour: eventTime.getHours(),
-                  minute: eventTime.getMinutes(),
-                },
-                eventEndTime: {
-                  hour: eventEndTime.getHours(),
-                  minute: eventEndTime.getMinutes(),
-                },
-              })
-            }
-            disabled={!canContinue}
-          />
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </TouchableWithoutFeedback>
+        <Pressable
+          style={({ pressed }) => [styles.primaryButton, (!canContinue || pressed) && styles.primaryButtonPressed, !canContinue && styles.primaryButtonDisabled]}
+          onPress={() =>
+            navigation.navigate("ChooseLocation", {
+              eventName: eventName.trim(),
+              eventDescription: eventDescription.trim() || undefined,
+              eventDate: {
+                year: eventDate.getFullYear(),
+                month: eventDate.getMonth() + 1,
+                day: eventDate.getDate(),
+              },
+              eventTime: {
+                hour: eventTime.getHours(),
+                minute: eventTime.getMinutes(),
+              },
+              eventEndTime: {
+                hour: eventEndTime.getHours(),
+                minute: eventEndTime.getMinutes(),
+              },
+            })
+          }
+          disabled={!canContinue}
+        >
+          <Text style={styles.primaryButtonText}>Choose location</Text>
+        </Pressable>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { flexGrow: 1, padding: 20, paddingBottom: 28 },
-  title: { fontSize: 24, fontWeight: "700", marginBottom: 20 },
-  label: { fontSize: 14, marginBottom: 8, opacity: 0.8 },
+  container: { flex: 1, backgroundColor: "#f7f1e8" },
+  content: { flexGrow: 1, padding: 20, paddingBottom: 120 },
+  heroCard: {
+    backgroundColor: "#fffaf4",
+    borderRadius: 28,
+    padding: 22,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#eadfce",
+    shadowColor: "#7a5c3d",
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 6,
+  },
+  title: { fontSize: 28, fontWeight: "800", marginBottom: 8, color: "#1f1a17" },
+  heroText: { fontSize: 15, lineHeight: 22, color: "#67594d" },
+  card: {
+    backgroundColor: "#fffaf4",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#eadfce",
+    padding: 16,
+    marginBottom: 12,
+  },
+  cardTitle: { fontSize: 18, fontWeight: "700", color: "#201c19", marginBottom: 8 },
+  label: { fontSize: 14, marginBottom: 8, color: "#201c19", fontWeight: "700" },
   input: {
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
+    borderColor: "#eadfce",
+    backgroundColor: "#fffaf4",
+    borderRadius: 14,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     fontSize: 16,
+    color: "#201c19",
   },
   pickerSection: { marginTop: 14 },
   iosPickerWrap: {
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 10,
+    borderColor: "#eadfce",
+    borderRadius: 14,
     paddingVertical: 8,
     paddingHorizontal: 10,
     alignItems: "stretch",
+    backgroundColor: "#fffaf4",
   },
   pickerButton: {
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
+    borderColor: "#eadfce",
+    borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 12,
+    backgroundColor: "#fffaf4",
   },
-  pickerButtonText: { fontSize: 16 },
+  pickerButtonText: { fontSize: 16, color: "#201c19" },
   descriptionInput: {
     minHeight: 90,
   },
-  errorText: { marginTop: 10, color: "#b00020", fontSize: 13 },
+  errorCard: {
+    marginTop: 10,
+    color: "#a23d3d",
+    fontSize: 13,
+    fontWeight: "600",
+    backgroundColor: "#fff4f1",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  primaryButton: {
+    marginTop: 6,
+    paddingVertical: 15,
+    borderRadius: 16,
+    alignItems: "center",
+    backgroundColor: "#2f5d50",
+  },
+  primaryButtonPressed: {
+    opacity: 0.9,
+  },
+  primaryButtonDisabled: {
+    backgroundColor: "#97aa9f",
+  },
+  primaryButtonText: {
+    color: "#ffffff",
+    fontWeight: "800",
+    fontSize: 16,
+  },
   spacer: { height: 16 },
 });
 

@@ -1,5 +1,14 @@
-import { useMemo, useState } from "react";
-import { View, Text, StyleSheet, Pressable, TextInput, ScrollView } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  TextInput,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import { CommonActions } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../App";
@@ -11,6 +20,12 @@ type Props = NativeStackScreenProps<RootStackParamList, "EventOverview">;
 type InvitedFriend = {
   id: string;
   username: string;
+};
+
+type FriendSuggestion = {
+  id: string;
+  username: string;
+  name: string;
 };
 
 const categoryOptions = [
@@ -44,6 +59,8 @@ export default function EventOverviewScreen({ route, navigation }: Props) {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
   const [addingInvitee, setAddingInvitee] = useState(false);
+  const [friendSuggestions, setFriendSuggestions] = useState<FriendSuggestion[]>([]);
+  const [loadingFriendSuggestions, setLoadingFriendSuggestions] = useState(true);
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [createEventError, setCreateEventError] = useState<string | null>(null);
   const [createEventSuccess, setCreateEventSuccess] = useState<string | null>(null);
@@ -82,6 +99,118 @@ export default function EventOverviewScreen({ route, navigation }: Props) {
       }),
     [eventDate.day, eventDate.month, eventDate.year]
   );
+
+  const availableFriendSuggestions = useMemo(() => {
+    const invitedIds = new Set(invitedPeople.map((person) => person.id));
+    const query = inviteInput.trim().toLowerCase();
+
+    return friendSuggestions.filter((friend) => {
+      if (invitedIds.has(friend.id)) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      return (
+        friend.username.toLowerCase().includes(query) ||
+        friend.name.toLowerCase().includes(query)
+      );
+    });
+  }, [friendSuggestions, inviteInput, invitedPeople]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadFriendSuggestions() {
+      setLoadingFriendSuggestions(true);
+
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) {
+        if (isMounted) {
+          setLoadingFriendSuggestions(false);
+        }
+        return;
+      }
+
+      const activeUserId = userData.user.id;
+
+      const { data: friendshipRows, error: friendshipsError } = await supabase
+        .from("friendships")
+        .select("user_a, user_b")
+        .or(`user_a.eq.${activeUserId},user_b.eq.${activeUserId}`);
+
+      if (friendshipsError) {
+        if (isMounted) {
+          setLoadingFriendSuggestions(false);
+        }
+        return;
+      }
+
+      const friendIds = (friendshipRows ?? [])
+        .map((row) => (row.user_a === activeUserId ? row.user_b : row.user_a))
+        .filter((id) => id !== activeUserId);
+
+      if (friendIds.length === 0) {
+        if (isMounted) {
+          setFriendSuggestions([]);
+          setLoadingFriendSuggestions(false);
+        }
+        return;
+      }
+
+      const { data: friendProfiles, error: friendProfilesError } = await supabase
+        .from("profiles")
+        .select("id, username, first_name, last_name")
+        .in("id", friendIds);
+
+      if (friendProfilesError) {
+        if (isMounted) {
+          setLoadingFriendSuggestions(false);
+        }
+        return;
+      }
+
+      const suggestions = (friendProfiles ?? [])
+        .filter((profile) => !!profile.username)
+        .map((profile) => {
+          const firstName = profile.first_name?.trim() ?? "";
+          const lastName = profile.last_name?.trim() ?? "";
+          const fullName = `${firstName} ${lastName}`.trim();
+
+          return {
+            id: profile.id,
+            username: profile.username?.trim() ?? "",
+            name: fullName || profile.username?.trim() || "Unknown user",
+          };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      if (isMounted) {
+        setFriendSuggestions(suggestions);
+        setLoadingFriendSuggestions(false);
+      }
+    }
+
+    void loadFriendSuggestions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  function addSuggestedFriend(friend: FriendSuggestion) {
+    setInviteError(null);
+    setInviteSuccess(`@${friend.username} added to invite list.`);
+    setInvitedPeople((prev) => {
+      if (prev.some((person) => person.id === friend.id)) {
+        return prev;
+      }
+
+      return [...prev, { id: friend.id, username: friend.username }];
+    });
+  }
 
   async function addInvitee() {
     const trimmed = inviteInput.trim();
@@ -260,154 +389,217 @@ export default function EventOverviewScreen({ route, navigation }: Props) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <StepIndicator step={3} total={3} label="Finalize" />
-      <Text style={styles.title}>Finalize event</Text>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 96 : 24}
+    >
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+      >
+        <StepIndicator step={3} total={3} label="Finalize" />
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Event summary</Text>
-        <Text style={styles.cardText}>Title: {eventName}</Text>
-        {eventDescription?.trim() ? <Text style={styles.cardText}>Description: {eventDescription}</Text> : null}
-        <Text style={styles.cardText}>Location: {locationLabel}</Text>
-        <Text style={styles.cardText}>Date: {eventDateLabel}</Text>
-        <Text style={styles.cardText}>Start: {eventStartTimeLabel}</Text>
-        <Text style={styles.cardText}>End: {eventEndTimeLabel}</Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Event settings</Text>
-
-        <Text style={styles.settingLabel}>Visibility</Text>
-        <View style={styles.toggleRow}>
-          {(["Private", "Public"] as const).map((option) => (
-            <Pressable
-              key={option}
-              style={[styles.optionChip, visibility === option && styles.optionChipActive]}
-              onPress={() => setVisibility(option)}
-            >
-              <Text style={[styles.optionChipText, visibility === option && styles.optionChipTextActive]}>{option}</Text>
-            </Pressable>
-          ))}
+        <View style={styles.heroCard}>
+          <Text style={styles.title}>Review everything before you create it.</Text>
+          <Text style={styles.heroText}>Set visibility, invitations, and preferences, then publish when it looks right.</Text>
         </View>
 
-        <Text style={styles.settingLabel}>Category</Text>
-        <View style={styles.toggleRow}>
-          {categoryOptions.map((option) => (
-            <Pressable
-              key={option}
-              style={[styles.optionChip, selectedCategory === option && styles.optionChipActive]}
-              onPress={() => setSelectedCategory(option)}
-            >
-              <Text style={[styles.optionChipText, selectedCategory === option && styles.optionChipTextActive]}>{option}</Text>
-            </Pressable>
-          ))}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Event summary</Text>
+          <Text style={styles.cardText}>Title: {eventName}</Text>
+          {eventDescription?.trim() ? <Text style={styles.cardText}>Description: {eventDescription}</Text> : null}
+          <Text style={styles.cardText}>Location: {locationLabel}</Text>
+          <Text style={styles.cardText}>Date: {eventDateLabel}</Text>
+          <Text style={styles.cardText}>Start: {eventStartTimeLabel}</Text>
+          <Text style={styles.cardText}>End: {eventEndTimeLabel}</Text>
         </View>
 
-        <Text style={styles.settingLabel}>Notification settings</Text>
-        <View style={styles.inlineSettingRow}>
-          <Text style={styles.inlineSettingText}>Notify about participant location updates</Text>
-          <Pressable
-            style={[styles.smallToggle, notifyLocationUpdates && styles.smallToggleActive]}
-            onPress={() => setNotifyLocationUpdates((prev) => !prev)}
-          >
-            <Text style={[styles.smallToggleText, notifyLocationUpdates && styles.smallToggleTextActive]}>
-              {notifyLocationUpdates ? "On" : "Off"}
-            </Text>
-          </Pressable>
-        </View>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Event settings</Text>
 
-        <View style={styles.inlineSettingRow}>
-          <Text style={styles.inlineSettingText}>Notify when participants are on the way / arrived</Text>
-          <Pressable
-            style={[styles.smallToggle, notifyArrivalUpdates && styles.smallToggleActive]}
-            onPress={() => setNotifyArrivalUpdates((prev) => !prev)}
-          >
-            <Text style={[styles.smallToggleText, notifyArrivalUpdates && styles.smallToggleTextActive]}>
-              {notifyArrivalUpdates ? "On" : "Off"}
-            </Text>
-          </Pressable>
-        </View>
-
-        <Text style={styles.settingLabel}>Notification frequency</Text>
-        <View style={styles.toggleRow}>
-          {frequencyOptions.map((option) => (
-            <Pressable
-              key={option}
-              style={[styles.optionChip, notificationFrequency === option && styles.optionChipActive]}
-              onPress={() => setNotificationFrequency(option)}
-            >
-              <Text style={[styles.optionChipText, notificationFrequency === option && styles.optionChipTextActive]}>
-                {option}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Invite people</Text>
-        <View style={styles.inviteRow}>
-          <TextInput
-            value={inviteInput}
-            onChangeText={setInviteInput}
-            placeholder="Add a friend's username"
-            style={styles.input}
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
-          <Pressable style={styles.addBtn} onPress={() => void addInvitee()} disabled={addingInvitee}>
-            <Text style={styles.addBtnText}>{addingInvitee ? "Checking..." : "Add"}</Text>
-          </Pressable>
-        </View>
-        {inviteError ? <Text style={styles.errorText}>{inviteError}</Text> : null}
-        {inviteSuccess ? <Text style={styles.successText}>{inviteSuccess}</Text> : null}
-
-        {invitedPeople.length === 0 ? (
-          <Text style={styles.placeholderText}>No people added yet.</Text>
-        ) : (
-          <View style={styles.chipsWrap}>
-            {invitedPeople.map((person) => (
-              <View key={person.id} style={styles.personChip}>
-                <Text style={styles.personChipText}>@{person.username}</Text>
-                <Pressable
-                  onPress={() => setInvitedPeople((prev) => prev.filter((invitee) => invitee.id !== person.id))}
-                  style={styles.removeChipButton}
-                >
-                  <Text style={styles.removeChipButtonText}>x</Text>
-                </Pressable>
-              </View>
+          <Text style={styles.settingLabel}>Visibility</Text>
+          <View style={styles.toggleRow}>
+            {(["Private", "Public"] as const).map((option) => (
+              <Pressable
+                key={option}
+                style={[styles.optionChip, visibility === option && styles.optionChipActive]}
+                onPress={() => setVisibility(option)}
+              >
+                <Text style={[styles.optionChipText, visibility === option && styles.optionChipTextActive]}>{option}</Text>
+              </Pressable>
             ))}
           </View>
-        )}
-      </View>
 
-      {createEventError ? <Text style={styles.errorText}>{createEventError}</Text> : null}
-      {createEventSuccess ? <Text style={styles.successText}>{createEventSuccess}</Text> : null}
+          <Text style={styles.settingLabel}>Category</Text>
+          <View style={styles.toggleRow}>
+            {categoryOptions.map((option) => (
+              <Pressable
+                key={option}
+                style={[styles.optionChip, selectedCategory === option && styles.optionChipActive]}
+                onPress={() => setSelectedCategory(option)}
+              >
+                <Text style={[styles.optionChipText, selectedCategory === option && styles.optionChipTextActive]}>{option}</Text>
+              </Pressable>
+            ))}
+          </View>
 
-      <Pressable style={[styles.primaryBtn, creatingEvent && styles.primaryBtnDisabled]} onPress={handleCreateEvent} disabled={creatingEvent}>
-        <Text style={styles.primaryBtnText}>
-          {creatingEvent ? "Creating..." : visibility === "Public" ? "Publish event" : "Create event"}
-        </Text>
-      </Pressable>
-    </ScrollView>
+          <Text style={styles.settingLabel}>Notification settings</Text>
+          <View style={styles.inlineSettingRow}>
+            <Text style={styles.inlineSettingText}>Notify about participant location updates</Text>
+            <Pressable
+              style={[styles.smallToggle, notifyLocationUpdates && styles.smallToggleActive]}
+              onPress={() => setNotifyLocationUpdates((prev) => !prev)}
+            >
+              <Text style={[styles.smallToggleText, notifyLocationUpdates && styles.smallToggleTextActive]}>
+                {notifyLocationUpdates ? "On" : "Off"}
+              </Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.inlineSettingRow}>
+            <Text style={styles.inlineSettingText}>Notify when participants are on the way or arrived</Text>
+            <Pressable
+              style={[styles.smallToggle, notifyArrivalUpdates && styles.smallToggleActive]}
+              onPress={() => setNotifyArrivalUpdates((prev) => !prev)}
+            >
+              <Text style={[styles.smallToggleText, notifyArrivalUpdates && styles.smallToggleTextActive]}>
+                {notifyArrivalUpdates ? "On" : "Off"}
+              </Text>
+            </Pressable>
+          </View>
+
+          <Text style={styles.settingLabel}>Notification frequency</Text>
+          <View style={styles.toggleRow}>
+            {frequencyOptions.map((option) => (
+              <Pressable
+                key={option}
+                style={[styles.optionChip, notificationFrequency === option && styles.optionChipActive]}
+                onPress={() => setNotificationFrequency(option)}
+              >
+                <Text style={[styles.optionChipText, notificationFrequency === option && styles.optionChipTextActive]}>
+                  {option}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Invite people</Text>
+          <View style={styles.inviteRow}>
+            <TextInput
+              value={inviteInput}
+              onChangeText={setInviteInput}
+              placeholder="Add a friend's username"
+              placeholderTextColor="#8a7f74"
+              style={styles.input}
+              autoCorrect={false}
+              autoCapitalize="none"
+              returnKeyType="done"
+            />
+            <Pressable style={[styles.addBtn, addingInvitee && styles.primaryBtnDisabled]} onPress={() => void addInvitee()} disabled={addingInvitee}>
+              <Text style={styles.addBtnText}>{addingInvitee ? "Checking..." : "Add"}</Text>
+            </Pressable>
+          </View>
+          {inviteError ? <Text style={styles.errorText}>{inviteError}</Text> : null}
+          {inviteSuccess ? <Text style={styles.successText}>{inviteSuccess}</Text> : null}
+
+          {invitedPeople.length > 0 ? (
+            <View style={styles.chipsWrap}>
+              {invitedPeople.map((person) => (
+                <View key={person.id} style={styles.personChip}>
+                  <Text style={styles.personChipText}>@{person.username}</Text>
+                  <Pressable
+                    onPress={() => setInvitedPeople((prev) => prev.filter((invitee) => invitee.id !== person.id))}
+                    style={styles.removeChipButton}
+                  >
+                    <Text style={styles.removeChipButtonText}>x</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          <View style={styles.suggestionSection}>
+            <Text style={styles.suggestionTitle}>Friends you can invite</Text>
+            {loadingFriendSuggestions ? (
+              <Text style={styles.placeholderText}>Loading friends...</Text>
+            ) : availableFriendSuggestions.length === 0 ? (
+              <Text style={styles.placeholderText}>
+                {friendSuggestions.length === 0
+                  ? "No friends added yet."
+                  : inviteInput.trim().length > 0
+                    ? "No friend matches that search."
+                    : "All available friends have been added."}
+              </Text>
+            ) : (
+              <View style={styles.suggestionList}>
+                {availableFriendSuggestions.map((friend) => (
+                  <Pressable
+                    key={friend.id}
+                    onPress={() => addSuggestedFriend(friend)}
+                    style={({ pressed }) => [styles.suggestionRow, pressed && styles.suggestionRowPressed]}
+                  >
+                    <View style={styles.suggestionAvatar}>
+                      <Text style={styles.suggestionAvatarText}>{friend.name.charAt(0).toUpperCase()}</Text>
+                    </View>
+                    <View style={styles.suggestionTextWrap}>
+                      <Text style={styles.suggestionName}>{friend.name}</Text>
+                      <Text style={styles.suggestionUsername}>@{friend.username}</Text>
+                    </View>
+                    <Text style={styles.suggestionAction}>Add</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </View>
+        </View>
+
+        {createEventError ? <Text style={styles.errorText}>{createEventError}</Text> : null}
+        {createEventSuccess ? <Text style={styles.successText}>{createEventSuccess}</Text> : null}
+
+        <Pressable style={[styles.primaryBtn, creatingEvent && styles.primaryBtnDisabled]} onPress={handleCreateEvent} disabled={creatingEvent}>
+          <Text style={styles.primaryBtnText}>
+            {creatingEvent ? "Creating..." : visibility === "Public" ? "Publish event" : "Create event"}
+          </Text>
+        </Pressable>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f4f6fb" },
-  content: { padding: 20, paddingBottom: 28 },
-  title: { fontSize: 26, fontWeight: "800", marginBottom: 14, color: "#1a2233" },
+  container: { flex: 1, backgroundColor: "#f7f1e8" },
+  content: { padding: 20, paddingBottom: 120 },
+  heroCard: {
+    backgroundColor: "#fffaf4",
+    borderRadius: 28,
+    padding: 22,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#eadfce",
+    shadowColor: "#7a5c3d",
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 6,
+  },
+  title: { fontSize: 28, fontWeight: "800", marginBottom: 8, color: "#1f1a17" },
+  heroText: { fontSize: 15, lineHeight: 22, color: "#67594d" },
   card: {
     borderWidth: 1,
-    borderColor: "#d9e2f3",
-    borderRadius: 14,
-    padding: 14,
-    backgroundColor: "#ffffff",
+    borderColor: "#eadfce",
+    borderRadius: 22,
+    padding: 16,
+    backgroundColor: "#fffaf4",
     marginBottom: 12,
   },
-  cardTitle: { fontSize: 16, fontWeight: "700", marginBottom: 8, color: "#1a2233" },
-  cardText: { fontSize: 14, color: "#4f5f78", marginBottom: 4 },
-  settingLabel: { fontSize: 14, fontWeight: "700", color: "#1a2233", marginTop: 8, marginBottom: 8 },
+  cardTitle: { fontSize: 18, fontWeight: "700", marginBottom: 10, color: "#201c19" },
+  cardText: { fontSize: 14, color: "#5f5145", marginBottom: 6, lineHeight: 20 },
+  settingLabel: { fontSize: 14, fontWeight: "700", color: "#201c19", marginTop: 8, marginBottom: 8 },
   toggleRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -416,19 +608,19 @@ const styles = StyleSheet.create({
   optionChip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#d8e1f2",
-    backgroundColor: "#f7f9fd",
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    borderColor: "#eadfce",
+    backgroundColor: "#f6eee4",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   optionChipActive: {
-    backgroundColor: "#1f4fa3",
-    borderColor: "#1f4fa3",
+    backgroundColor: "#2f5d50",
+    borderColor: "#2f5d50",
   },
   optionChipText: {
     fontSize: 12,
-    color: "#4c5e7b",
-    fontWeight: "600",
+    color: "#5f5145",
+    fontWeight: "700",
   },
   optionChipTextActive: {
     color: "#ffffff",
@@ -437,48 +629,109 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 8,
+    marginBottom: 10,
     gap: 10,
   },
-  inlineSettingText: { flex: 1, fontSize: 13, color: "#33415c" },
+  inlineSettingText: { flex: 1, fontSize: 13, color: "#4f4339", lineHeight: 18 },
   smallToggle: {
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#d8e1f2",
+    borderColor: "#eadfce",
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: "#f7f9fd",
+    backgroundColor: "#f6eee4",
   },
   smallToggleActive: {
-    backgroundColor: "#1f4fa3",
-    borderColor: "#1f4fa3",
+    backgroundColor: "#2f5d50",
+    borderColor: "#2f5d50",
   },
-  smallToggleText: { color: "#4c5e7b", fontWeight: "700", fontSize: 12 },
+  smallToggleText: { color: "#5f5145", fontWeight: "700", fontSize: 12 },
   smallToggleTextActive: { color: "#ffffff" },
   inviteRow: { flexDirection: "row", gap: 8, alignItems: "center" },
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#d8e1f2",
-    borderRadius: 10,
+    borderColor: "#eadfce",
+    borderRadius: 14,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     fontSize: 14,
-    color: "#1a2233",
+    color: "#201c19",
+    backgroundColor: "#fffaf4",
   },
   addBtn: {
-    backgroundColor: "#1f4fa3",
-    borderRadius: 10,
+    backgroundColor: "#2f5d50",
+    borderRadius: 14,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   addBtnText: { color: "#ffffff", fontWeight: "700" },
-  placeholderText: { marginTop: 10, fontSize: 13, color: "#6b7a90" },
+  placeholderText: { marginTop: 10, fontSize: 13, color: "#6f6258" },
+  suggestionSection: { marginTop: 10 },
+  suggestionTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#4f4339",
+    marginBottom: 10,
+  },
+  suggestionList: {
+    maxHeight: 220,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#eadfce",
+    overflow: "hidden",
+    backgroundColor: "#fff6ea",
+  },
+  suggestionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: "#efe4d7",
+    backgroundColor: "#fffaf4",
+  },
+  suggestionRowPressed: {
+    opacity: 0.86,
+  },
+  suggestionAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#efe3d3",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  suggestionAvatarText: {
+    color: "#4f4339",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  suggestionTextWrap: {
+    flex: 1,
+  },
+  suggestionName: {
+    color: "#201c19",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  suggestionUsername: {
+    color: "#6f6258",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  suggestionAction: {
+    color: "#2f5d50",
+    fontSize: 13,
+    fontWeight: "700",
+    marginLeft: 10,
+  },
   chipsWrap: { marginTop: 10, flexDirection: "row", flexWrap: "wrap", gap: 8 },
   personChip: {
-    backgroundColor: "#eef3fb",
+    backgroundColor: "#fff6ea",
     borderWidth: 1,
-    borderColor: "#d8e1f2",
+    borderColor: "#eadfce",
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -486,25 +739,43 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  personChipText: { color: "#33415c", fontSize: 12, fontWeight: "600" },
+  personChipText: { color: "#4f4339", fontSize: 12, fontWeight: "600" },
   removeChipButton: {
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: "#d4deef",
+    backgroundColor: "#e7d6c4",
     alignItems: "center",
     justifyContent: "center",
   },
-  removeChipButtonText: { color: "#33415c", fontSize: 11, fontWeight: "700" },
+  removeChipButtonText: { color: "#4f4339", fontSize: 11, fontWeight: "700" },
   primaryBtn: {
     marginTop: 6,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 15,
+    borderRadius: 16,
     alignItems: "center",
-    backgroundColor: "#111",
+    backgroundColor: "#2f5d50",
   },
-  primaryBtnDisabled: { backgroundColor: "#777" },
-  primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  errorText: { color: "#b00020", marginBottom: 8 },
-  successText: { color: "#2f7d32", marginBottom: 8 },
+  primaryBtnDisabled: { opacity: 0.7 },
+  primaryBtnText: { color: "#fff", fontWeight: "800", fontSize: 16 },
+  errorText: {
+    color: "#a23d3d",
+    fontSize: 13,
+    fontWeight: "600",
+    backgroundColor: "#fff4f1",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 10,
+  },
+  successText: {
+    color: "#2f5d50",
+    fontSize: 13,
+    fontWeight: "600",
+    backgroundColor: "#eef3e8",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 10,
+  },
 });

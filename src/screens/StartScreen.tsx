@@ -57,32 +57,29 @@ export default function StartScreen({ navigation }: Props) {
     }, [loadOverview])
   );
 
-  const heroChipText =
-    upcomingCount > 0
-      ? `${upcomingCount} upcoming ${upcomingCount === 1 ? "event" : "events"}`
-      : pendingInviteCount > 0
-        ? `${pendingInviteCount} pending ${pendingInviteCount === 1 ? "invite" : "invites"}`
-        : "No upcoming events yet";
+  const overviewStats = [
+    { label: "Upcoming", value: upcomingCount, cardStyle: styles.statCardWarm },
+    { label: "Pending", value: pendingInviteCount, cardStyle: styles.statCardCool },
+    { label: "Hosting", value: hostingCount, cardStyle: styles.statCardNeutral },
+  ];
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
-        <Text style={styles.eyebrow}>HOME</Text>
+        <Text style={styles.eyebrow}>Home</Text>
         <Text style={styles.title}>Hi, {displayUsername}</Text>
-        <Text style={styles.subtitle}>Plan your next meetup fast.</Text>
-        <View style={styles.heroChip}>
-          <Text style={styles.heroChipText}>{heroChipText}</Text>
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Get started</Text>
+        <Text style={styles.heroText}>Plan, host, and participate in events.</Text>
         <Pressable
           style={({ pressed }) => [styles.primaryCard, pressed && styles.pressed]}
           onPress={() => navigation.navigate("CreateEventDetails")}
         >
-          <Text style={styles.primaryCardTitle}>Create event</Text>
-          <Text style={styles.primaryCardText}>Set event details, date, and location.</Text>
+          <View style={styles.primaryCardContent}>
+            <View>
+              <Text style={styles.primaryCardTitle}>Create event</Text>
+              <Text style={styles.primaryCardText}>Set the details, time, and location in a few taps.</Text>
+            </View>
+            <Text style={styles.primaryCardArrow}>+</Text>
+          </View>
         </Pressable>
       </View>
 
@@ -94,18 +91,12 @@ export default function StartScreen({ navigation }: Props) {
           </Pressable>
         </View>
         <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{upcomingCount}</Text>
-            <Text style={styles.statLabel}>Upcoming</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{pendingInviteCount}</Text>
-            <Text style={styles.statLabel}>Pending invites</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{hostingCount}</Text>
-            <Text style={styles.statLabel}>Hosting</Text>
-          </View>
+          {overviewStats.map((stat) => (
+            <View key={stat.label} style={[styles.statCard, stat.cardStyle]}>
+              <Text style={styles.statValue}>{stat.value}</Text>
+              <Text style={styles.statLabel}>{stat.label}</Text>
+            </View>
+          ))}
         </View>
       </View>
 
@@ -146,31 +137,38 @@ export default function StartScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f4f6fb" },
-  content: { padding: 20, paddingBottom: 28 },
+  container: { flex: 1, backgroundColor: "#f7f1e8" },
+  content: { padding: 20, paddingBottom: 120 },
   hero: {
-    backgroundColor: "#10264a",
-    borderRadius: 20,
-    padding: 18,
+    position: "relative",
+    backgroundColor: "#fffaf4",
+    borderRadius: 28,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: "#eadfce",
+    shadowColor: "#7a5c3d",
+    shadowOffset: {
+      width: 0,
+      height: 14,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 6,
   },
   eyebrow: {
-    color: "#9fb7db",
+    color: "#8a6a4a",
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1,
     marginBottom: 6,
   },
-  title: { color: "#ffffff", fontSize: 30, fontWeight: "800", marginBottom: 4 },
-  subtitle: { color: "#d7e3f6", fontSize: 14 },
-  heroChip: {
-    marginTop: 14,
-    alignSelf: "flex-start",
-    backgroundColor: "#1d3c70",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  title: { color: "#1f1a17", fontSize: 30, fontWeight: "800", marginBottom: 8 },
+  heroText: {
+    color: "#67594d",
+    fontSize: 15,
+    lineHeight: 22,
+    maxWidth: "80%",
   },
-  heroChipText: { color: "#d7e3f6", fontSize: 12, fontWeight: "600" },
   section: { marginTop: 24 },
   sectionHeader: {
     flexDirection: "row",
@@ -178,50 +176,77 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 10,
   },
-  sectionTitle: { fontSize: 18, fontWeight: "700", color: "#1a2233", marginBottom: 10 },
-  sectionAction: { fontSize: 14, fontWeight: "700", color: "#1f4fa3" },
+  sectionTitle: { fontSize: 18, fontWeight: "700", color: "#201c19", marginBottom: 10 },
+  sectionAction: { fontSize: 14, fontWeight: "700", color: "#9d5c2f" },
   primaryCard: {
-    backgroundColor: "#1f4fa3",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 10,
+    marginTop: 18,
+    backgroundColor: "#2f5d50",
+    borderRadius: 22,
+    padding: 18,
   },
-  primaryCardTitle: { color: "#ffffff", fontSize: 18, fontWeight: "700", marginBottom: 4 },
-  primaryCardText: { color: "#d8e5fb", fontSize: 14, lineHeight: 20 },
+  primaryCardContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 16,
+  },
+  primaryCardEyebrow: {
+    color: "#cfe0d8",
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+    marginBottom: 6,
+  },
+  primaryCardTitle: { color: "#ffffff", fontSize: 22, fontWeight: "700", marginBottom: 4 },
+  primaryCardText: { color: "#d9e8e1", fontSize: 14, lineHeight: 20, maxWidth: 220 },
+  primaryCardArrow: {
+    color: "#ffffff",
+    fontSize: 32,
+    fontWeight: "300",
+    lineHeight: 32,
+  },
   pressed: { opacity: 0.85 },
   statsRow: { flexDirection: "row", gap: 10 },
   statCard: {
     flex: 1,
-    backgroundColor: "#ffffff",
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 10,
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: "#e4eaf5",
+    borderColor: "#eadfce",
   },
-  statValue: { fontSize: 20, fontWeight: "800", color: "#1a2233" },
-  statLabel: { marginTop: 3, fontSize: 12, color: "#5d6a80" },
+  statCardWarm: {
+    backgroundColor: "#fffaf4",
+  },
+  statCardCool: {
+    backgroundColor: "#fffaf4",
+  },
+  statCardNeutral: {
+    backgroundColor: "#fffaf4",
+  },
+  statValue: { fontSize: 24, fontWeight: "800", color: "#241f1c" },
+  statLabel: { marginTop: 5, fontSize: 12, color: "#6f6258" },
   activityCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
+    backgroundColor: "#fffaf4",
+    borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#e4eaf5",
+    borderColor: "#eadfce",
     marginBottom: 10,
   },
   activityHeader: { marginBottom: 8 },
   activityBadge: {
     alignSelf: "flex-start",
-    backgroundColor: "#eef3fb",
-    color: "#35527f",
+    backgroundColor: "#efe3d3",
+    color: "#84502a",
     borderRadius: 999,
     overflow: "hidden",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     fontSize: 11,
     fontWeight: "700",
   },
-  activityTitle: { color: "#1a2233", fontSize: 15, fontWeight: "700", marginBottom: 4 },
-  activityText: { color: "#5d6a80", fontSize: 14 },
-  activityMeta: { color: "#3f4e68", fontSize: 12, fontWeight: "600", marginTop: 8 },
+  activityTitle: { color: "#241f1c", fontSize: 16, fontWeight: "700", marginBottom: 4 },
+  activityText: { color: "#67594d", fontSize: 14, lineHeight: 20 },
+  activityMeta: { color: "#4e6258", fontSize: 12, fontWeight: "600", marginTop: 8 },
 });

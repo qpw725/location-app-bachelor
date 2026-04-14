@@ -91,9 +91,28 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 
+const sharedHeaderOptions = {
+  headerStyle: {
+    backgroundColor: "#f7f1e8",
+  },
+  headerShadowVisible: false,
+  headerTintColor: "#3f352d",
+  headerTitleStyle: {
+    color: "#201c19",
+    fontSize: 18,
+    fontWeight: "700" as const,
+  },
+  headerBackTitleStyle: {
+    color: "#6f6258",
+    fontSize: 14,
+    fontWeight: "500" as const,
+  },
+  headerBackTitleVisible: false,
+};
+
 function AuthScreens() {
   return (
-    <AuthStack.Navigator>
+    <AuthStack.Navigator screenOptions={sharedHeaderOptions}>
       <AuthStack.Screen name="Login" component={LoginScreen} options={{ title: "Login" }} />
       <AuthStack.Screen name="Register" component={RegisterScreen} options={{ title: "Register" }} />
       <AuthStack.Screen name="RegisterProfile" component={RegisterProfileScreen} options={{ title: "Register" }} />
@@ -126,7 +145,7 @@ function MainTabs() {
         tabBarIconStyle: styles.tabBarIcon,
         tabBarItemStyle: styles.tabBarItem,
         tabBarStyle: styles.tabBar,
-        headerShadowVisible: false,
+        ...sharedHeaderOptions,
       })}
     >
       <Tab.Screen name="Start" component={StartScreen} options={{ title: "Home", headerTitle: "Home" }} />
@@ -203,7 +222,7 @@ export default function App() {
   return (
     <NavigationContainer>
       {session ? (
-        <Stack.Navigator initialRouteName="MainTabs">
+        <Stack.Navigator initialRouteName="MainTabs" screenOptions={sharedHeaderOptions}>
           <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
           <Stack.Screen
             name="NotificationSettings"
