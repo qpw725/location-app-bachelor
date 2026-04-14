@@ -648,7 +648,7 @@ export default function InboxScreen() {
     >
       <View style={styles.hero}>
         <Text style={styles.heroEyebrow}>Inbox</Text>
-        <Text style={styles.heroTitle}>Keep up with everything new.</Text>
+        <Text style={styles.heroTitle}>Keep up with everything new</Text>
         <Text style={styles.heroSubtitle}>
           {pendingEventInvites.length + pendingFriendRequests.length} actions waiting across invites and friend requests.
         </Text>

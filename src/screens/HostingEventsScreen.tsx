@@ -245,7 +245,7 @@ export default function HostingEventsScreen({ navigation }: Props) {
     >
       <View style={styles.hero}>
         <Text style={styles.heroEyebrow}>Hosting</Text>
-        <Text style={styles.heroTitle}>Events you are running and managing.</Text>
+        <Text style={styles.heroTitle}>Events you are running and managing</Text>
         <Text style={styles.heroSubtitle}>Keep tabs on details, invitees, and updates from one calm overview.</Text>
       </View>
       {loading ? (

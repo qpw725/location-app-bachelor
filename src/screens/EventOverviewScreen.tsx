@@ -403,7 +403,7 @@ export default function EventOverviewScreen({ route, navigation }: Props) {
         <StepIndicator step={3} total={3} label="Finalize" />
 
         <View style={styles.heroCard}>
-          <Text style={styles.title}>Review everything before you create it.</Text>
+          <Text style={styles.title}>Review everything before you create it</Text>
           <Text style={styles.heroText}>Set visibility, invitations, and preferences, then publish when it looks right.</Text>
         </View>
 

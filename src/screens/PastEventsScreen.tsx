@@ -39,7 +39,7 @@ export default function PastEventsScreen() {
     >
       <View style={styles.hero}>
         <Text style={styles.heroEyebrow}>Past</Text>
-        <Text style={styles.heroTitle}>Moments you have already wrapped up.</Text>
+        <Text style={styles.heroTitle}>Moments you have already wrapped up</Text>
         <Text style={styles.heroSubtitle}>A simple history of completed events you hosted or attended.</Text>
       </View>
       {loading ? (

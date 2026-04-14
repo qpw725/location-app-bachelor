@@ -282,7 +282,7 @@ export default function EventsScreen({ navigation }: Props) {
     >
       <View style={styles.hero}>
         <Text style={styles.heroEyebrow}>Events</Text>
-        <Text style={styles.heroTitle}>Your plans, all in one place, and new ones to explore.</Text>
+        <Text style={styles.heroTitle}>Your plans and new ones to explore</Text>
         <Text style={styles.heroSubtitle}>Browse your own plans or explore public events that match your mood.</Text>
       </View>
 

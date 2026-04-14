@@ -142,7 +142,7 @@ export default function ChooseLocationScreen({ navigation, route }: Props) {
       <StepIndicator step={2} total={3} label="Location" />
 
       <View style={styles.heroCard}>
-        <Text style={styles.title}>Pick where it should happen.</Text>
+        <Text style={styles.title}>Pick where it should happen</Text>
         <Text style={styles.subtitle}>Search for a place, preview it on the map, and confirm the spot for {eventName}.</Text>
       </View>
 

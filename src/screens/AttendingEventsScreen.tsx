@@ -63,7 +63,7 @@ export default function AttendingEventsScreen({ navigation }: Props) {
     >
       <View style={styles.hero}>
         <Text style={styles.heroEyebrow}>Attending</Text>
-        <Text style={styles.heroTitle}>Plans you have said yes to.</Text>
+        <Text style={styles.heroTitle}>Plans you have said yes to</Text>
         <Text style={styles.heroSubtitle}>Accepted invites and joined events live here, ready when you need them.</Text>
       </View>
       {loading ? (
