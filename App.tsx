@@ -280,8 +280,7 @@ export default function App() {
 const styles = StyleSheet.create({
   tabBar: {
     position: "absolute",
-    left: "6%",
-    right: "6%",
+    marginHorizontal: 28,
     bottom: 24,
     height: 74,
     borderTopWidth: 0,
