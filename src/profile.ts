@@ -10,6 +10,7 @@ type ProfileRow = {
   first_name: string | null;
   last_name: string | null;
   avatar_path: string | null;
+  event_notifications_enabled?: boolean | null;
 };
 
 export type CurrentProfile = {
@@ -22,6 +23,7 @@ export type CurrentProfile = {
   memberSince: string;
   avatarPath: string | null;
   avatarUrl: string | null;
+  eventNotificationsEnabled: boolean;
 };
 
 export async function fetchCurrentProfile(): Promise<{ profile: CurrentProfile | null; error: string | null }> {
@@ -40,7 +42,7 @@ export async function fetchCurrentProfile(): Promise<{ profile: CurrentProfile |
 
   const { data: profileRow, error: profileError } = await supabase
     .from("profiles")
-    .select("username, first_name, last_name, avatar_path")
+    .select("username, first_name, last_name, avatar_path, event_notifications_enabled")
     .eq("id", user.id)
     .maybeSingle<ProfileRow>();
 
@@ -74,9 +76,38 @@ export async function fetchCurrentProfile(): Promise<{ profile: CurrentProfile |
       memberSince,
       avatarPath,
       avatarUrl: getAvatarPublicUrl(avatarPath),
+      eventNotificationsEnabled: profileRow?.event_notifications_enabled ?? true,
     },
     error: null,
   };
+}
+
+export async function updateEventNotificationsPreference(enabled: boolean): Promise<{ error: string | null }> {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError) {
+    return { error: userError.message };
+  }
+
+  if (!user) {
+    return { error: "Could not identify the current user." };
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      event_notifications_enabled: enabled,
+    })
+    .eq("id", user.id);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  return { error: null };
 }
 
 export function getAvatarPublicUrl(avatarPath: string | null | undefined) {

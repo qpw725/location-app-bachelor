@@ -6,6 +6,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { Session } from "@supabase/supabase-js";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import * as Notifications from "expo-notifications";
 
 import StartScreen from "./src/screens/StartScreen";
 import EventsScreen from "./src/screens/EventsScreen";
@@ -24,6 +25,7 @@ import LoginScreen from "./src/screens/LoginScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
 import RegisterProfileScreen from "./src/screens/RegisterProfileScreen";
 import { initializeEventLocationSharing } from "./src/locationSharingManager";
+import { syncPushTokenForCurrentUser } from "./src/notifications";
 import { supabase } from "./src/supabase";
 
 
@@ -90,6 +92,15 @@ type AuthStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 const sharedHeaderOptions = {
   headerStyle: {
@@ -166,6 +177,7 @@ export default function App() {
     }
 
     void initializeEventLocationSharing();
+    void syncPushTokenForCurrentUser();
   }, [session]);
 
   useEffect(() => {

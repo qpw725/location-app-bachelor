@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { getSupabaseDebugInfo, supabase, testSupabaseConnection } from "../supabase";
 
@@ -73,91 +73,153 @@ export default function LoginScreen({ navigation }: Props) {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Welcome back</Text>
-      <Text style={styles.subtitle}>Log in to continue.</Text>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      alwaysBounceVertical
+      overScrollMode="always"
+    >
+      <View style={styles.heroCard}>
+        <Text style={styles.heroEyebrow}>Welcome</Text>
+        <Text style={styles.title}>Login or create an account</Text>
+        <Text style={styles.subtitle}>Get back to your events or sign up to start planning and joining new ones</Text>
+        <Text style={styles.subtitle}></Text>
+      </View>
 
-      <Text style={styles.label}>Email</Text>
-      <TextInput
-        value={email}
-        onChangeText={setEmail}
-        style={styles.input}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        placeholder="you@example.com"
-      />
+      <View style={styles.formCard}>
+        <Text style={styles.label}>Email</Text>
+        <TextInput
+          value={email}
+          onChangeText={setEmail}
+          style={styles.input}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          placeholder="you@example.com"
+          placeholderTextColor="#8a7f74"
+        />
 
-      <Text style={styles.label}>Password</Text>
-      <TextInput
-        value={password}
-        onChangeText={setPassword}
-        style={styles.input}
-        secureTextEntry
-        placeholder="Your password"
-      />
+        <Text style={styles.label}>Password</Text>
+        <TextInput
+          value={password}
+          onChangeText={setPassword}
+          style={styles.input}
+          secureTextEntry
+          placeholder="Your password"
+          placeholderTextColor="#8a7f74"
+        />
 
-      {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-      {connectionMessage ? <Text style={styles.info}>{connectionMessage}</Text> : null}
+        {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+        {connectionMessage ? <Text style={styles.info}>{connectionMessage}</Text> : null}
 
-      <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]} onPress={handleLogin} disabled={loading}>
-        <Text style={styles.primaryButtonText}>{loading ? "Logging in..." : "Login"}</Text>
-      </Pressable>
+        <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]} onPress={handleLogin} disabled={loading}>
+          <Text style={styles.primaryButtonText}>{loading ? "Logging in..." : "Login"}</Text>
+        </Pressable>
 
-      <Pressable
-        onPress={handleConnectionTest}
-        disabled={testingConnection}
-        style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-      >
-        <Text style={styles.secondaryButtonText}>
-          {testingConnection ? "Testing connection..." : "Test Supabase connection"}
-        </Text>
-      </Pressable>
+        <Pressable
+          onPress={handleConnectionTest}
+          disabled={testingConnection}
+          style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+        >
+          <Text style={styles.secondaryButtonText}>
+            {testingConnection ? "Testing connection..." : "Test Supabase connection"}
+          </Text>
+        </Pressable>
 
-      <Pressable onPress={() => navigation.navigate("Register")} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}>
-        <Text style={styles.secondaryButtonText}>Create account</Text>
-      </Pressable>
-    </View>
+        <Pressable onPress={() => navigation.navigate("Register")} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}>
+          <Text style={styles.secondaryButtonText}>Create account</Text>
+        </Pressable>
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f4f6fb",
-    justifyContent: "center",
-    padding: 20,
+    backgroundColor: "#f7f1e8",
   },
-  title: { fontSize: 30, fontWeight: "800", color: "#1a2233" },
-  subtitle: { marginTop: 4, marginBottom: 24, fontSize: 15, color: "#5d6a80" },
-  label: { marginBottom: 6, marginTop: 10, fontSize: 14, color: "#1a2233", fontWeight: "600" },
+  content: {
+    padding: 20,
+    paddingBottom: 40,
+    justifyContent: "center",
+    flexGrow: 1,
+  },
+  heroCard: {
+    backgroundColor: "#fffaf4",
+    borderRadius: 28,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: "#eadfce",
+    shadowColor: "#7a5c3d",
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 6,
+    marginBottom: 16,
+  },
+  heroEyebrow: {
+    color: "#8a6a4a",
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  title: { fontSize: 30, fontWeight: "800", color: "#1f1a17" },
+  subtitle: { marginTop: 8, fontSize: 15, color: "#67594d", lineHeight: 22 },
+  formCard: {
+    backgroundColor: "#fffaf4",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#eadfce",
+    padding: 18,
+  },
+  label: { marginBottom: 6, marginTop: 10, fontSize: 14, color: "#201c19", fontWeight: "700" },
   input: {
     borderWidth: 1,
-    borderColor: "#d9e2f3",
-    borderRadius: 12,
-    backgroundColor: "#fff",
+    borderColor: "#eadfce",
+    borderRadius: 14,
+    backgroundColor: "#fffaf4",
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 16,
+    color: "#201c19",
   },
-  error: { color: "#c53535", marginTop: 10, fontSize: 14 },
-  info: { color: "#1f4fa3", marginTop: 10, fontSize: 14 },
+  error: {
+    color: "#c53535",
+    marginTop: 10,
+    fontSize: 14,
+    backgroundColor: "#fff4f1",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  info: {
+    color: "#2f5d50",
+    marginTop: 10,
+    fontSize: 14,
+    backgroundColor: "#eef3e8",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
   primaryButton: {
     marginTop: 18,
-    borderRadius: 12,
-    backgroundColor: "#1f4fa3",
-    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: "#2f5d50",
+    paddingVertical: 15,
     alignItems: "center",
   },
   primaryButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
   secondaryButton: {
     marginTop: 10,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#d9e2f3",
-    backgroundColor: "#fff",
+    borderColor: "#eadfce",
+    backgroundColor: "#f6eee4",
     paddingVertical: 14,
     alignItems: "center",
   },
-  secondaryButtonText: { color: "#1f4fa3", fontWeight: "700", fontSize: 16 },
+  secondaryButtonText: { color: "#4f4339", fontWeight: "700", fontSize: 16 },
   pressed: { opacity: 0.85 },
 });

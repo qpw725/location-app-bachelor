@@ -20,6 +20,7 @@ const defaultProfile: CurrentProfile = {
   memberSince: "Unknown",
   avatarPath: null,
   avatarUrl: null,
+  eventNotificationsEnabled: true,
 };
 
 export default function MyProfileScreen({ navigation }: Props) {
@@ -187,6 +188,7 @@ export default function MyProfileScreen({ navigation }: Props) {
           onPress={() => navigation.navigate("NotificationSettings")}
         >
           <Text style={styles.settingsText}>Notifications</Text>
+          <Text style={styles.settingsValue}>{profile.eventNotificationsEnabled ? "On" : "Off"}</Text>
         </Pressable>
         <Pressable
           style={({ pressed }) => [styles.settingsRow, styles.infoSpacing, pressed && styles.pressed]}
@@ -340,6 +342,11 @@ const styles = StyleSheet.create({
     color: "#201c19",
     fontWeight: "700",
     flex: 1,
+  },
+  settingsValue: {
+    fontSize: 13,
+    color: "#6f6258",
+    fontWeight: "700",
   },
   signOutText: {
     color: "#b33737",

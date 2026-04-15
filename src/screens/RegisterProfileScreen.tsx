@@ -54,8 +54,30 @@ export default function RegisterProfileScreen({ navigation, route }: Props) {
     setDateOfBirth(selectedDate);
   }
 
+  function mapRegisterErrorMessage(message: string) {
+    const normalized = message.toLowerCase();
+
+    if (normalized.includes("user already registered")) {
+      return "That email is already registered.";
+    }
+
+    if (normalized.includes("database error saving new user")) {
+      return "Could not create account. The email or username may already be in use.";
+    }
+
+    return message;
+  }
+
   async function handleRegister() {
-    if (!email || !password || !username || !firstName || !lastName) {
+    if (loading) {
+      return;
+    }
+
+    const trimmedUsername = username.trim();
+    const trimmedFirstName = firstName.trim();
+    const trimmedLastName = lastName.trim();
+
+    if (!email || !password || !trimmedUsername || !trimmedFirstName || !trimmedLastName) {
       setErrorMessage("Please fill out all fields.");
       return;
     }
@@ -69,14 +91,34 @@ export default function RegisterProfileScreen({ navigation, route }: Props) {
       const debugInfo = getSupabaseDebugInfo();
       console.log("[Register] Supabase debug info:", debugInfo);
 
-      const { data, error } = await supabase.auth.signUp({
+      const { data: existingUsername, error: existingUsernameError } = await supabase
+        .from("profiles")
+        .select("id")
+        .ilike("username", trimmedUsername)
+        .limit(1)
+        .maybeSingle();
+
+      if (existingUsernameError) {
+        console.error("[Register] username lookup error:", existingUsernameError);
+        setErrorMessage(existingUsernameError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (existingUsername) {
+        setErrorMessage("That username is already taken.");
+        setLoading(false);
+        return;
+      }
+
+      const { error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
           data: {
-            username: username.trim(),
-            first_name: firstName.trim(),
-            last_name: lastName.trim(),
+            username: trimmedUsername,
+            first_name: trimmedFirstName,
+            last_name: trimmedLastName,
             date_of_birth: formattedDobValue,
           },
         },
@@ -84,7 +126,8 @@ export default function RegisterProfileScreen({ navigation, route }: Props) {
 
       if (error) {
         console.error("[Register] signUp error:", error);
-        setErrorMessage(`${error.message}${error.status ? ` (status ${error.status})` : ""}`);
+        const mappedMessage = mapRegisterErrorMessage(error.message);
+        setErrorMessage(`${mappedMessage}${error.status ? ` (status ${error.status})` : ""}`);
       } else {
         setMessage("Account created. Check your email if confirmation is required.");
       }
@@ -118,94 +161,94 @@ export default function RegisterProfileScreen({ navigation, route }: Props) {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.contentContainer}
+      contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
       alwaysBounceVertical
       overScrollMode="always"
     >
-      <Text style={styles.title}>Create account</Text>
-      <Text style={styles.subtitle}>Step 2 of 2: profile details.</Text>
+      <View style={styles.heroCard}>
+        <Text style={styles.heroEyebrow}>Create account</Text>
+        <Text style={styles.title}>Add the details for your profile</Text>
+        <Text style={styles.subtitle}>Step 2 of 2</Text>
+      </View>
 
-      <Text style={styles.emailText}>Email: {email}</Text>
+      <View style={styles.formCard}>
+        <Text style={styles.emailPill}>Email: {email}</Text>
 
-      <Text style={styles.label}>Username</Text>
-      <TextInput
-        value={username}
-        onChangeText={setUsername}
-        style={styles.input}
-        autoCapitalize="none"
-        placeholder="Username"
-      />
+        <Text style={styles.label}>Username</Text>
+        <TextInput
+          value={username}
+          onChangeText={setUsername}
+          style={styles.input}
+          autoCapitalize="none"
+          placeholder="Username"
+          placeholderTextColor="#8a7f74"
+        />
 
-      <Text style={styles.label}>First name</Text>
-      <TextInput
-        value={firstName}
-        onChangeText={setFirstName}
-        style={styles.input}
-        placeholder="First name"
-      />
+        <Text style={styles.label}>First name</Text>
+        <TextInput
+          value={firstName}
+          onChangeText={setFirstName}
+          style={styles.input}
+          placeholder="First name"
+          placeholderTextColor="#8a7f74"
+        />
 
-      <Text style={styles.label}>Last name</Text>
-      <TextInput
-        value={lastName}
-        onChangeText={setLastName}
-        style={styles.input}
-        placeholder="Last name"
-      />
+        <Text style={styles.label}>Last name</Text>
+        <TextInput
+          value={lastName}
+          onChangeText={setLastName}
+          style={styles.input}
+          placeholder="Last name"
+          placeholderTextColor="#8a7f74"
+        />
 
-      <Text style={styles.label}>Date of birth</Text>
-      {Platform.OS === "ios" ? (
-        <View style={styles.iosPickerWrap}>
-          <DateTimePicker
-            value={dateOfBirth}
-            mode="date"
-            display="compact"
-            onChange={onDateOfBirthChange}
-            maximumDate={new Date()}
-          />
-        </View>
-      ) : (
-        <>
-          <Pressable onPress={() => setShowAndroidDobPicker(true)} style={styles.pickerButton}>
-            <Text style={styles.pickerButtonText}>{formattedDobLabel}</Text>
-          </Pressable>
-          {showAndroidDobPicker && (
+        <Text style={styles.label}>Date of birth</Text>
+        {Platform.OS === "ios" ? (
+          <View style={styles.iosPickerWrap}>
             <DateTimePicker
               value={dateOfBirth}
               mode="date"
-              display="default"
+              display="compact"
               onChange={onDateOfBirthChange}
               maximumDate={new Date()}
             />
-          )}
-        </>
-      )}
+          </View>
+        ) : (
+          <>
+            <Pressable onPress={() => setShowAndroidDobPicker(true)} style={styles.pickerButton}>
+              <Text style={styles.pickerButtonText}>{formattedDobLabel}</Text>
+            </Pressable>
+            {showAndroidDobPicker && (
+              <DateTimePicker
+                value={dateOfBirth}
+                mode="date"
+                display="default"
+                onChange={onDateOfBirthChange}
+                maximumDate={new Date()}
+              />
+            )}
+          </>
+        )}
 
-      {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-      {message ? <Text style={styles.success}>{message}</Text> : null}
-      {connectionMessage ? <Text style={styles.info}>{connectionMessage}</Text> : null}
+        {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+        {message ? <Text style={styles.success}>{message}</Text> : null}
+        {connectionMessage ? <Text style={styles.info}>{connectionMessage}</Text> : null}
 
-      <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]} onPress={handleRegister} disabled={loading}>
-        <Text style={styles.primaryButtonText}>{loading ? "Creating..." : "Register"}</Text>
-      </Pressable>
+        <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]} onPress={handleRegister} disabled={loading}>
+          <Text style={styles.primaryButtonText}>{loading ? "Creating..." : "Register"}</Text>
+        </Pressable>
 
-      <Pressable
-        onPress={handleConnectionTest}
-        disabled={testingConnection}
-        style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-      >
-        <Text style={styles.secondaryButtonText}>
-          {testingConnection ? "Testing connection..." : "Test Supabase connection"}
-        </Text>
-      </Pressable>
-
-      <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}>
-        <Text style={styles.secondaryButtonText}>Back to step 1</Text>
-      </Pressable>
-
-      <Pressable onPress={() => navigation.navigate("Login")} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}>
-        <Text style={styles.secondaryButtonText}>Back to login</Text>
-      </Pressable>
+        <Pressable
+          onPress={handleConnectionTest}
+          disabled={testingConnection}
+          style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+        >
+          <Text style={styles.secondaryButtonText}>
+            {testingConnection ? "Testing connection..." : "Test Supabase connection"}
+          </Text>
+        </Pressable>
+      </View>
     </ScrollView>
   );
 }
@@ -213,66 +256,130 @@ export default function RegisterProfileScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f4f6fb",
+    backgroundColor: "#f7f1e8",
   },
-  contentContainer: {
-    justifyContent: "center",
+  content: {
     padding: 20,
-    paddingBottom: 28,
+    paddingBottom: 40,
     flexGrow: 1,
+    justifyContent: "center",
   },
-  title: { fontSize: 30, fontWeight: "800", color: "#1a2233" },
-  subtitle: { marginTop: 4, marginBottom: 10, fontSize: 15, color: "#5d6a80" },
-  emailText: { marginBottom: 14, fontSize: 13, color: "#5d6a80" },
-  label: { marginBottom: 6, marginTop: 10, fontSize: 14, color: "#1a2233", fontWeight: "600" },
+  heroCard: {
+    backgroundColor: "#fffaf4",
+    borderRadius: 28,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: "#eadfce",
+    shadowColor: "#7a5c3d",
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 6,
+    marginBottom: 16,
+  },
+  heroEyebrow: {
+    color: "#8a6a4a",
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  title: { fontSize: 30, fontWeight: "800", color: "#1f1a17" },
+  subtitle: { marginTop: 8, fontSize: 15, color: "#67594d", lineHeight: 22 },
+  formCard: {
+    backgroundColor: "#fffaf4",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#eadfce",
+    padding: 18,
+  },
+  emailPill: {
+    alignSelf: "flex-start",
+    marginBottom: 4,
+    fontSize: 13,
+    color: "#5f5145",
+    fontWeight: "700",
+    backgroundColor: "#f6eee4",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "#eadfce",
+  },
+  label: { marginBottom: 6, marginTop: 10, fontSize: 14, color: "#201c19", fontWeight: "700" },
   input: {
     borderWidth: 1,
-    borderColor: "#d9e2f3",
-    borderRadius: 12,
-    backgroundColor: "#fff",
+    borderColor: "#eadfce",
+    borderRadius: 14,
+    backgroundColor: "#fffaf4",
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 16,
+    color: "#201c19",
   },
   iosPickerWrap: {
     borderWidth: 1,
-    borderColor: "#d9e2f3",
-    borderRadius: 12,
-    backgroundColor: "#fff",
+    borderColor: "#eadfce",
+    borderRadius: 14,
+    backgroundColor: "#fffaf4",
     paddingVertical: 10,
     paddingHorizontal: 10,
     marginTop: 2,
   },
   pickerButton: {
     borderWidth: 1,
-    borderColor: "#d9e2f3",
-    borderRadius: 12,
-    backgroundColor: "#fff",
+    borderColor: "#eadfce",
+    borderRadius: 14,
+    backgroundColor: "#fffaf4",
     paddingHorizontal: 12,
     paddingVertical: 14,
     marginTop: 2,
   },
-  pickerButtonText: { fontSize: 16, color: "#1a2233" },
-  error: { color: "#c53535", marginTop: 10, fontSize: 14 },
-  success: { color: "#2f7d32", marginTop: 10, fontSize: 14 },
-  info: { color: "#1f4fa3", marginTop: 10, fontSize: 14 },
+  pickerButtonText: { fontSize: 16, color: "#201c19" },
+  error: {
+    color: "#c53535",
+    marginTop: 10,
+    fontSize: 14,
+    backgroundColor: "#fff4f1",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  success: {
+    color: "#2f7d32",
+    marginTop: 10,
+    fontSize: 14,
+    backgroundColor: "#eef3e8",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  info: {
+    color: "#2f5d50",
+    marginTop: 10,
+    fontSize: 14,
+    backgroundColor: "#eef3e8",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
   primaryButton: {
     marginTop: 18,
-    borderRadius: 12,
-    backgroundColor: "#1f4fa3",
-    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: "#2f5d50",
+    paddingVertical: 15,
     alignItems: "center",
   },
   primaryButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
   secondaryButton: {
     marginTop: 10,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#d9e2f3",
-    backgroundColor: "#fff",
+    borderColor: "#eadfce",
+    backgroundColor: "#f6eee4",
     paddingVertical: 14,
     alignItems: "center",
   },
-  secondaryButtonText: { color: "#1f4fa3", fontWeight: "700", fontSize: 16 },
+  secondaryButtonText: { color: "#4f4339", fontWeight: "700", fontSize: 16 },
   pressed: { opacity: 0.85 },
 });

@@ -352,6 +352,12 @@ export default function HostingEventsScreen({ navigation }: Props) {
       <Modal visible={eventToEdit !== null} transparent animationType="fade" onRequestClose={() => setEventToEdit(null)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
+            <ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={styles.modalScrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
             <Text style={styles.modalTitle}>Edit event</Text>
             <Text style={styles.modalText}>{eventToEdit ? eventToEdit.title : ""}</Text>
 
@@ -522,6 +528,7 @@ export default function HostingEventsScreen({ navigation }: Props) {
                 </Text>
               </Pressable>
             </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -659,6 +666,13 @@ const styles = StyleSheet.create({
     padding: 18,
     borderWidth: 1,
     borderColor: "#eadfce",
+    maxHeight: "88%",
+  },
+  modalScroll: {
+    flexGrow: 0,
+  },
+  modalScrollContent: {
+    paddingBottom: 4,
   },
   modalTitle: { fontSize: 18, fontWeight: "800", color: "#201c19", marginBottom: 8 },
   modalText: { fontSize: 14, color: "#5f5145", lineHeight: 20 },
