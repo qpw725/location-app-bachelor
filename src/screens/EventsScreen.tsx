@@ -6,10 +6,11 @@ import {
   StyleSheet,
   Pressable,
   TextInput,
-  PanResponder,
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
+import * as Location from "expo-location";
+import Slider from "@react-native-community/slider";
 import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { CompositeScreenProps, useFocusEffect } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -21,6 +22,24 @@ type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, "Events">,
   NativeStackScreenProps<RootStackParamList>
 >;
+
+const MAX_DISTANCE_KM = 160;
+
+function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+
+  const dLat = toRadians(lat2 - lat1);
+  const dLon = toRadians(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(lat1)) *
+      Math.cos(toRadians(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+
+  return 2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 function MyEventPreviewCard({ title, description, time, place, host, genre, visibility }: EventItem) {
   return (
@@ -115,7 +134,6 @@ export default function EventsScreen({ navigation }: Props) {
   const [activeView, setActiveView] = useState<"myEvents" | "discover">("myEvents");
   const [discoverSearch, setDiscoverSearch] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [locationFilter, setLocationFilter] = useState<"Any" | "Nearby" | "City Center">("Any");
   const [timeFilter, setTimeFilter] = useState<"Any" | "Today" | "This Week">("Any");
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -125,6 +143,38 @@ export default function EventsScreen({ navigation }: Props) {
   const [hostingEvents, setHostingEvents] = useState<EventItem[]>([]);
   const [pastEvents, setPastEvents] = useState<EventItem[]>([]);
   const [joiningEventId, setJoiningEventId] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationFilterMessage, setLocationFilterMessage] = useState<string | null>(null);
+  const [distanceFilterKm, setDistanceFilterKm] = useState(MAX_DISTANCE_KM);
+
+  const loadUserLocation = useCallback(async (promptIfNeeded = false) => {
+    try {
+      let permission = await Location.getForegroundPermissionsAsync();
+
+      if (!permission.granted && promptIfNeeded) {
+        permission = await Location.requestForegroundPermissionsAsync();
+      }
+
+      if (!permission.granted) {
+        setUserLocation(null);
+        setLocationFilterMessage("Location permission is needed to use the Nearby filter.");
+        return;
+      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      setUserLocation({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      });
+      setLocationFilterMessage(null);
+    } catch {
+      setUserLocation(null);
+      setLocationFilterMessage("Could not determine your location for the Nearby filter.");
+    }
+  }, []);
 
   const categoryOptions = useMemo(() => {
     const seeded = [
@@ -187,15 +237,20 @@ export default function EventsScreen({ navigation }: Props) {
     const matchesCategory =
       selectedCategories.length === 0 || selectedCategories.includes(event.genre);
 
-    const lowerPlace = event.place.toLowerCase();
     const matchesLocation =
-      locationFilter === "Any" ||
-      (locationFilter === "Nearby" && !lowerPlace.includes("city center")) ||
-      (locationFilter === "City Center" && lowerPlace.includes("city center"));
+      !userLocation ||
+      (
+        !!userLocation &&
+        typeof event.latitude === "number" &&
+        typeof event.longitude === "number" &&
+        getDistanceKm(userLocation.latitude, userLocation.longitude, event.latitude, event.longitude) <= distanceFilterKm
+      );
 
     const now = new Date();
     const start = event.startAt;
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(todayStart.getDate() + 1);
     const weekEnd = new Date(todayStart);
     weekEnd.setDate(todayStart.getDate() + 7);
     const matchesTime =
@@ -203,11 +258,11 @@ export default function EventsScreen({ navigation }: Props) {
       (timeFilter === "Today" &&
         !!start &&
         start >= todayStart &&
-        start < new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + 1)) ||
+        start < tomorrowStart) ||
       (timeFilter === "This Week" && !!start && start >= todayStart && start < weekEnd);
 
     return matchesSearch && matchesCategory && matchesLocation && matchesTime;
-  });
+  }, [discoverSearch, distanceFilterKm, publicEvents, selectedCategories, timeFilter, userLocation]);
 
   const discoverList = useMemo(() => {
     const seen = new Set<string>();
@@ -251,32 +306,10 @@ export default function EventsScreen({ navigation }: Props) {
     );
   }
 
-  const swipeResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gestureState) => {
-          const isHorizontalSwipe = Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
-          return isHorizontalSwipe && Math.abs(gestureState.dx) > 20;
-        },
-        onPanResponderRelease: (_, gestureState) => {
-          if (gestureState.dx < -50) {
-            setActiveView("discover");
-            return;
-          }
-
-          if (gestureState.dx > 50) {
-            setActiveView("myEvents");
-          }
-        },
-      }),
-    []
-  );
-
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
-      {...swipeResponder.panHandlers}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
     >
       <View style={styles.hero}>
@@ -368,25 +401,35 @@ export default function EventsScreen({ navigation }: Props) {
               ))}
             </View>
 
-            <Text style={styles.filterLabel}>Distance / Location</Text>
-            <View style={styles.filterRow}>
-              {(["Any", "Nearby", "City Center"] as const).map((option) => (
-                <Pressable
-                  key={option}
-                  style={[styles.filterChip, locationFilter === option && styles.filterChipActive]}
-                  onPress={() => setLocationFilter(option)}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      locationFilter === option && styles.filterChipTextActive,
-                    ]}
-                  >
-                    {option}
-                  </Text>
-                </Pressable>
-              ))}
+            <View style={styles.distanceSection}>
+              <View style={styles.distanceHeader}>
+                <Text style={styles.filterLabel}>Distance</Text>
+                <Text style={styles.distanceValue}>{distanceFilterKm} km</Text>
+              </View>
+              <Slider
+                style={styles.slider}
+                minimumValue={0}
+                maximumValue={MAX_DISTANCE_KM}
+                step={1}
+                value={distanceFilterKm}
+                minimumTrackTintColor="#2f5d50"
+                maximumTrackTintColor="#efe4d7"
+                thumbTintColor="#2f5d50"
+                onSlidingStart={() => {
+                  if (!userLocation) {
+                    void loadUserLocation(true);
+                  }
+                }}
+                onValueChange={(value) => {
+                  setDistanceFilterKm(Math.round(value));
+                }}
+              />
+              <View style={styles.distanceScale}>
+                <Text style={styles.distanceScaleText}>0 km</Text>
+                <Text style={styles.distanceScaleText}>{MAX_DISTANCE_KM} km</Text>
+              </View>
             </View>
+            {locationFilterMessage ? <Text style={styles.filterHelpText}>{locationFilterMessage}</Text> : null}
 
             <Text style={styles.filterLabel}>Time / Date</Text>
             <View style={styles.filterRow}>
@@ -501,13 +544,50 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     color: "#4f4339",
+    marginBottom: 4,
+  },
+  distanceSection: {
+    marginTop: 12,
     marginBottom: 8,
+  },
+  distanceHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: -4,
+  },
+  distanceValue: {
+    fontSize: 13,
+    color: "#4f4339",
+    fontWeight: "700",
+  },
+  slider: {
+    height: 36,
+    marginHorizontal: 0,
+    marginBottom: 2,
+  },
+  distanceScale: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  distanceScaleText: {
+    fontSize: 12,
+    color: "#8a7f74",
+    fontWeight: "600",
   },
   filterRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
     marginBottom: 12,
+  },
+  filterHelpText: {
+    marginTop: -2,
+    marginBottom: 12,
+    color: "#6f6258",
+    fontSize: 12,
+    lineHeight: 18,
   },
   filterChip: {
     borderRadius: 999,
