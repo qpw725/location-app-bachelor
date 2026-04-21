@@ -1,4 +1,3 @@
-import { Platform } from "react-native";
 import { Buffer } from "buffer";
 import * as ImagePicker from "expo-image-picker";
 import { supabase } from "./supabase";
@@ -176,7 +175,6 @@ export async function pickAndUploadAvatar(options: {
             quality: 0.8,
             base64: true,
             mediaTypes: ["images"],
-            ...(Platform.OS === "android" ? { shape: "oval" as const } : {}),
           })
         : await ImagePicker.launchImageLibraryAsync({
             allowsEditing: true,
@@ -184,7 +182,6 @@ export async function pickAndUploadAvatar(options: {
             quality: 0.8,
             base64: true,
             mediaTypes: ["images"],
-            ...(Platform.OS === "android" ? { shape: "oval" as const } : {}),
           });
 
     if (pickerResult.canceled || !pickerResult.assets[0]) {

@@ -5,7 +5,6 @@ import {
   TextInput,
   StyleSheet,
   Pressable,
-  Platform,
   KeyboardAvoidingView,
   ScrollView,
 } from "react-native";
@@ -36,9 +35,6 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
     now.setHours(now.getHours() + 2);
     return now;
   });
-  const [showAndroidDatePicker, setShowAndroidDatePicker] = useState(false);
-  const [showAndroidTimePicker, setShowAndroidTimePicker] = useState(false);
-  const [showAndroidEndTimePicker, setShowAndroidEndTimePicker] = useState(false);
 
   const eventStartOnDate = new Date(
     eventDate.getFullYear(),
@@ -62,26 +58,7 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
   const hasFutureStartTime = eventStartOnDate.getTime() > now.getTime();
   const hasValidTimeRange = eventEndOnDate.getTime() > eventStartOnDate.getTime();
   const canContinue = eventName.trim().length > 0 && hasValidTimeRange && hasFutureStartTime;
-  const formattedDate = eventDate.toLocaleDateString([], {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-  const formattedTime = eventTime.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const formattedEndTime = eventEndTime.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
   function onDateChange(event: DateTimePickerEvent, selectedDate?: Date) {
-    if (Platform.OS === "android") {
-      setShowAndroidDatePicker(false);
-    }
-
     if (event.type === "dismissed" || !selectedDate) {
       return;
     }
@@ -90,10 +67,6 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
   }
 
   function onTimeChange(event: DateTimePickerEvent, selectedDate?: Date) {
-    if (Platform.OS === "android") {
-      setShowAndroidTimePicker(false);
-    }
-
     if (event.type === "dismissed" || !selectedDate) {
       return;
     }
@@ -102,10 +75,6 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
   }
 
   function onEndTimeChange(event: DateTimePickerEvent, selectedDate?: Date) {
-    if (Platform.OS === "android") {
-      setShowAndroidEndTimePicker(false);
-    }
-
     if (event.type === "dismissed" || !selectedDate) {
       return;
     }
@@ -116,12 +85,12 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior="padding"
     >
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+        keyboardDismissMode="interactive"
       >
         <StepIndicator step={1} total={3} label="Create event" />
         <View style={styles.heroCard}>
@@ -158,90 +127,41 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
           <View style={styles.pickerSection}>
             <Text style={styles.label}>Event date</Text>
 
-            {Platform.OS === "ios" ? (
-              <View style={styles.iosPickerWrap}>
-                <DateTimePicker
-                  value={eventDate}
-                  mode="date"
-                  display="compact"
-                  onChange={onDateChange}
-                  minimumDate={new Date()}
-                />
-              </View>
-            ) : (
-              <>
-                <Pressable onPress={() => setShowAndroidDatePicker(true)} style={styles.pickerButton}>
-                  <Text style={styles.pickerButtonText}>{formattedDate}</Text>
-                </Pressable>
-                {showAndroidDatePicker && (
-                  <DateTimePicker
-                    value={eventDate}
-                    mode="date"
-                    display="default"
-                    onChange={onDateChange}
-                    minimumDate={new Date()}
-                  />
-                )}
-              </>
-            )}
+            <View style={styles.iosPickerWrap}>
+              <DateTimePicker
+                value={eventDate}
+                mode="date"
+                display="compact"
+                onChange={onDateChange}
+                minimumDate={new Date()}
+              />
+            </View>
           </View>
 
           <View style={styles.pickerSection}>
             <Text style={styles.label}>Start time</Text>
 
-            {Platform.OS === "ios" ? (
-              <View style={styles.iosPickerWrap}>
-                <DateTimePicker
-                  value={eventTime}
-                  mode="time"
-                  display="compact"
-                  onChange={onTimeChange}
-                />
-              </View>
-            ) : (
-              <>
-                <Pressable onPress={() => setShowAndroidTimePicker(true)} style={styles.pickerButton}>
-                  <Text style={styles.pickerButtonText}>{formattedTime}</Text>
-                </Pressable>
-                {showAndroidTimePicker && (
-                  <DateTimePicker
-                    value={eventTime}
-                    mode="time"
-                    display="default"
-                    onChange={onTimeChange}
-                  />
-                )}
-              </>
-            )}
+            <View style={styles.iosPickerWrap}>
+              <DateTimePicker
+                value={eventTime}
+                mode="time"
+                display="compact"
+                onChange={onTimeChange}
+              />
+            </View>
           </View>
 
           <View style={styles.pickerSection}>
             <Text style={styles.label}>End time</Text>
 
-            {Platform.OS === "ios" ? (
-              <View style={styles.iosPickerWrap}>
-                <DateTimePicker
-                  value={eventEndTime}
-                  mode="time"
-                  display="compact"
-                  onChange={onEndTimeChange}
-                />
-              </View>
-            ) : (
-              <>
-                <Pressable onPress={() => setShowAndroidEndTimePicker(true)} style={styles.pickerButton}>
-                  <Text style={styles.pickerButtonText}>{formattedEndTime}</Text>
-                </Pressable>
-                {showAndroidEndTimePicker && (
-                  <DateTimePicker
-                    value={eventEndTime}
-                    mode="time"
-                    display="default"
-                    onChange={onEndTimeChange}
-                  />
-                )}
-              </>
-            )}
+            <View style={styles.iosPickerWrap}>
+              <DateTimePicker
+                value={eventEndTime}
+                mode="time"
+                display="compact"
+                onChange={onEndTimeChange}
+              />
+            </View>
           </View>
         </View>
 
@@ -333,15 +253,6 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     backgroundColor: "#fffaf4",
   },
-  pickerButton: {
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    backgroundColor: "#fffaf4",
-  },
-  pickerButtonText: { fontSize: 16, color: "#201c19" },
   descriptionInput: {
     minHeight: 90,
   },

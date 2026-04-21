@@ -1,4 +1,3 @@
-import { Platform } from "react-native";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { supabase } from "./supabase";
@@ -54,7 +53,6 @@ async function storePushTokenForCurrentUser(token: string) {
       {
         user_id: user.id,
         token,
-        platform: Platform.OS,
         updated_at: new Date().toISOString(),
       },
     ],
@@ -79,13 +77,6 @@ export async function registerPushTokenForCurrentUser(options?: {
       token: null,
       error: "Missing Expo project id. Add EXPO_PUBLIC_EXPO_PROJECT_ID to your environment before testing push notifications.",
     };
-  }
-
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("default", {
-      name: "default",
-      importance: Notifications.AndroidImportance.DEFAULT,
-    });
   }
 
   const existingPermissions = await Notifications.getPermissionsAsync();

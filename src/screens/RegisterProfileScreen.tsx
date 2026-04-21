@@ -1,7 +1,7 @@
 import { useState } from "react";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { getSupabaseDebugInfo, supabase, testSupabaseConnection } from "../supabase";
 
 type AuthStackParamList = {
@@ -25,27 +25,15 @@ export default function RegisterProfileScreen({ navigation, route }: Props) {
     now.setHours(0, 0, 0, 0);
     return now;
   });
-  const [showAndroidDobPicker, setShowAndroidDobPicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [connectionMessage, setConnectionMessage] = useState<string | null>(null);
 
-  const formattedDobLabel = dateOfBirth.toLocaleDateString([], {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-
   const formattedDobValue = `${dateOfBirth.getFullYear()}-${String(dateOfBirth.getMonth() + 1).padStart(2, "0")}-${String(dateOfBirth.getDate()).padStart(2, "0")}`;
 
   function onDateOfBirthChange(event: DateTimePickerEvent, selectedDate?: Date) {
-    if (Platform.OS === "android") {
-      setShowAndroidDobPicker(false);
-    }
-
     if (event.type === "dismissed" || !selectedDate) {
       return;
     }
@@ -204,32 +192,15 @@ export default function RegisterProfileScreen({ navigation, route }: Props) {
         />
 
         <Text style={styles.label}>Date of birth</Text>
-        {Platform.OS === "ios" ? (
-          <View style={styles.iosPickerWrap}>
-            <DateTimePicker
-              value={dateOfBirth}
-              mode="date"
-              display="compact"
-              onChange={onDateOfBirthChange}
-              maximumDate={new Date()}
-            />
-          </View>
-        ) : (
-          <>
-            <Pressable onPress={() => setShowAndroidDobPicker(true)} style={styles.pickerButton}>
-              <Text style={styles.pickerButtonText}>{formattedDobLabel}</Text>
-            </Pressable>
-            {showAndroidDobPicker && (
-              <DateTimePicker
-                value={dateOfBirth}
-                mode="date"
-                display="default"
-                onChange={onDateOfBirthChange}
-                maximumDate={new Date()}
-              />
-            )}
-          </>
-        )}
+        <View style={styles.iosPickerWrap}>
+          <DateTimePicker
+            value={dateOfBirth}
+            mode="date"
+            display="compact"
+            onChange={onDateOfBirthChange}
+            maximumDate={new Date()}
+          />
+        </View>
 
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
         {message ? <Text style={styles.success}>{message}</Text> : null}
@@ -326,16 +297,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     marginTop: 2,
   },
-  pickerButton: {
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    borderRadius: 14,
-    backgroundColor: "#fffaf4",
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    marginTop: 2,
-  },
-  pickerButtonText: { fontSize: 16, color: "#201c19" },
   error: {
     color: "#c53535",
     marginTop: 10,

@@ -10,7 +10,6 @@ import {
   Pressable,
   Modal,
   TextInput,
-  Platform,
 } from "react-native";
 import {
   addHostedEventInvite,
@@ -47,7 +46,6 @@ export default function HostingEventsScreen({ navigation }: Props) {
   const [eventToDelete, setEventToDelete] = useState<EventItem | null>(null);
   const [eventToEdit, setEventToEdit] = useState<EditDraft | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [editInviteInput, setEditInviteInput] = useState("");
   const [eventInvitees, setEventInvitees] = useState<HostedEventInvitee[]>([]);
   const [loadingInvitees, setLoadingInvitees] = useState(false);
@@ -117,7 +115,6 @@ export default function HostingEventsScreen({ navigation }: Props) {
 
     await loadEvents();
     setEventToEdit(null);
-    setShowDatePicker(false);
     setProcessingEventId(null);
   }, [eventToEdit, loadEvents]);
 
@@ -127,7 +124,6 @@ export default function HostingEventsScreen({ navigation }: Props) {
     }
 
     setActionError(null);
-    setShowDatePicker(false);
     setEditInviteInput("");
     setEventInvitees([]);
     setEventToEdit({
@@ -196,10 +192,6 @@ export default function HostingEventsScreen({ navigation }: Props) {
   );
 
   function onEditDateChange(_event: DateTimePickerEvent, selectedDate?: Date) {
-    if (Platform.OS === "android") {
-      setShowDatePicker(false);
-    }
-
     if (!selectedDate || !eventToEdit) {
       return;
     }
@@ -229,13 +221,6 @@ export default function HostingEventsScreen({ navigation }: Props) {
       endAt: nextEnd,
     });
   }
-
-  const formattedEditDate = eventToEdit?.startAt.toLocaleDateString([], {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
 
   return (
     <ScrollView
@@ -362,32 +347,15 @@ export default function HostingEventsScreen({ navigation }: Props) {
             <Text style={styles.modalText}>{eventToEdit ? eventToEdit.title : ""}</Text>
 
             <Text style={styles.fieldLabel}>Date</Text>
-            {Platform.OS === "ios" ? (
-              <View style={styles.iosPickerWrap}>
-                <DateTimePicker
-                  value={eventToEdit?.startAt ?? new Date()}
-                  mode="date"
-                  display="compact"
-                  onChange={onEditDateChange}
-                  minimumDate={new Date()}
-                />
-              </View>
-            ) : (
-              <>
-                <Pressable style={styles.inputButton} onPress={() => setShowDatePicker(true)}>
-                  <Text style={styles.inputButtonText}>{formattedEditDate ?? "Choose date"}</Text>
-                </Pressable>
-                {showDatePicker ? (
-                  <DateTimePicker
-                    value={eventToEdit?.startAt ?? new Date()}
-                    mode="date"
-                    display="default"
-                    onChange={onEditDateChange}
-                    minimumDate={new Date()}
-                  />
-                ) : null}
-              </>
-            )}
+            <View style={styles.iosPickerWrap}>
+              <DateTimePicker
+                value={eventToEdit?.startAt ?? new Date()}
+                mode="date"
+                display="compact"
+                onChange={onEditDateChange}
+                minimumDate={new Date()}
+              />
+            </View>
 
             <Text style={styles.fieldLabel}>Location</Text>
             <TextInput
@@ -506,7 +474,6 @@ export default function HostingEventsScreen({ navigation }: Props) {
                 onPress={() => {
                   if (processingEventId === null) {
                     setEventToEdit(null);
-                    setShowDatePicker(false);
                     setEditInviteInput("");
                     setEventInvitees([]);
                     setActionError(null);
@@ -688,15 +655,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fffaf4",
   },
   inviteRow: { flexDirection: "row", gap: 8, alignItems: "center", marginTop: 2 },
-  inputButton: {
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    backgroundColor: "#fffaf4",
-  },
-  inputButtonText: { fontSize: 14, color: "#201c19" },
   iosPickerWrap: {
     borderWidth: 1,
     borderColor: "#eadfce",
