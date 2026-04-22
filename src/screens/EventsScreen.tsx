@@ -41,22 +41,11 @@ function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   return 2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function MyEventPreviewCard({ title, description, time, place, host, genre, visibility }: EventItem) {
+function MyEventPreviewCard({ title, place }: EventItem) {
   return (
     <View style={styles.previewEventCard}>
-      <View style={styles.eventHeader}>
-        <Text style={styles.eventTitle}>{title}</Text>
-        <View style={[styles.visibilityBadge, visibility === "Public" ? styles.publicBadge : styles.privateBadge]}>
-          <Text style={styles.visibilityText}>{visibility}</Text>
-        </View>
-      </View>
-      <Text style={styles.eventDescription} numberOfLines={2}>{description}</Text>
-      <Text style={styles.eventMeta}>{time}</Text>
-      <Text style={styles.eventMeta}>{place}</Text>
-      <View style={styles.discoverFooter}>
-        <Text style={styles.discoverHost}>{host}</Text>
-        <Text style={styles.discoverVibe}>{genre}</Text>
-      </View>
+      <Text style={styles.previewTitle} numberOfLines={1}>{title}</Text>
+      <Text style={styles.previewAddress} numberOfLines={2}>{place}</Text>
     </View>
   );
 }
@@ -116,6 +105,9 @@ function CategoryCard({
         <View>
           <Text style={styles.categoryLabel}>{label}</Text>
           <Text style={styles.categoryCount}>{count} events</Text>
+        </View>
+        <View style={styles.categoryArrowWrap}>
+          <Text style={styles.categoryArrow}>›</Text>
         </View>
       </View>
 
@@ -622,6 +614,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  categoryArrowWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#f6eee4",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#eadfce",
+  },
+  categoryArrow: { color: "#4f4339", fontSize: 28, fontWeight: "500", lineHeight: 30 },
   categoryLabel: { fontSize: 18, fontWeight: "700", color: "#201c19" },
   categoryCount: { marginTop: 2, fontSize: 13, color: "#6f6258" },
   previewWrap: { marginTop: 10 },
@@ -634,6 +637,8 @@ const styles = StyleSheet.create({
     borderColor: "#eadfce",
     padding: 12,
   },
+  previewTitle: { color: "#241f1c", fontSize: 15, fontWeight: "700", marginBottom: 4 },
+  previewAddress: { color: "#6f6258", fontSize: 13, lineHeight: 18 },
   eventHeader: {
     flexDirection: "row",
     alignItems: "center",

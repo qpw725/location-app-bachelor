@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { ScrollView, View, Text, StyleSheet, ActivityIndicator, RefreshControl, Pressable, Modal } from "react-native";
+import { ScrollView, View, Text, StyleSheet, ActivityIndicator, RefreshControl, Pressable } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import EventAttendeeSection from "../components/EventAttendeeSection";
-import { fetchEventBuckets, leaveEvent, type EventItem } from "../data/eventStore";
+import { useFocusEffect } from "@react-navigation/native";
+import { fetchEventBuckets, type EventItem } from "../data/eventStore";
 import type { RootStackParamList } from "../../App";
 
 type Props = NativeStackScreenProps<RootStackParamList, "AttendingEvents">;
@@ -12,9 +12,6 @@ export default function AttendingEventsScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [processingEventId, setProcessingEventId] = useState<string | null>(null);
-  const [eventToLeave, setEventToLeave] = useState<EventItem | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
 
   const loadEvents = useCallback(async () => {
     setError(null);
@@ -32,28 +29,17 @@ export default function AttendingEventsScreen({ navigation }: Props) {
     void loadEvents();
   }, [loadEvents]);
 
+  useFocusEffect(
+    useCallback(() => {
+      void loadEvents();
+    }, [loadEvents])
+  );
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadEvents();
     setRefreshing(false);
   }, [loadEvents]);
-
-  const handleLeave = useCallback(
-    async (eventId: string) => {
-      setActionError(null);
-      setProcessingEventId(eventId);
-      const { error: leaveError } = await leaveEvent(eventId);
-      if (leaveError) {
-        setActionError(leaveError);
-        setProcessingEventId(null);
-        return;
-      }
-      await loadEvents();
-      setEventToLeave(null);
-      setProcessingEventId(null);
-    },
-    [loadEvents]
-  );
 
   return (
     <ScrollView
@@ -84,81 +70,20 @@ export default function AttendingEventsScreen({ navigation }: Props) {
         </View>
       ) : null}
       {events.map((event) => (
-        <View key={event.id} style={styles.eventCard}>
-          <View style={styles.eventHeader}>
-            <Text style={styles.eventTitle}>{event.title}</Text>
-            <View style={[styles.visibilityBadge, event.visibility === "Public" ? styles.publicBadge : styles.privateBadge]}>
-              <Text style={styles.visibilityText}>{event.visibility}</Text>
+        <Pressable
+          key={event.id}
+          onPress={() => navigation.navigate("EventDetails", { eventId: event.id, eventTitle: event.title, mode: "attending" })}
+          style={({ pressed }) => [styles.eventCard, pressed && styles.pressed]}
+        >
+          <View style={styles.eventSummaryRow}>
+            <View style={styles.eventSummaryText}>
+              <Text style={styles.eventTitle} numberOfLines={1}>{event.title}</Text>
+              <Text style={styles.eventMeta} numberOfLines={2}>{event.place}</Text>
             </View>
+            <Text style={styles.eventArrow}>›</Text>
           </View>
-          <Text style={styles.eventDescription}>{event.description}</Text>
-          <Text style={styles.eventMeta}>{event.time}</Text>
-          <Text style={styles.eventMeta}>{event.place}</Text>
-          <View style={styles.metaFooter}>
-            <Text style={styles.metaLabel}>{event.host}</Text>
-            <Text style={styles.metaLabel}>{event.genre}</Text>
-          </View>
-          <EventAttendeeSection eventId={event.id} />
-          <View style={styles.actionRow}>
-            <Pressable
-              style={styles.mapButton}
-              onPress={() => navigation.navigate("EventMap", { eventId: event.id, eventTitle: event.title })}
-            >
-              <Text style={styles.mapButtonText}>Map</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.secondaryButton, processingEventId === event.id && styles.secondaryButtonDisabled]}
-              onPress={() => {
-                setActionError(null);
-                setEventToLeave(event);
-              }}
-              disabled={processingEventId !== null}
-            >
-              <Text style={styles.secondaryButtonText}>
-                {processingEventId === event.id ? "Leaving..." : "Leave event"}
-              </Text>
-            </Pressable>
-          </View>
-        </View>
+        </Pressable>
       ))}
-      <Modal visible={eventToLeave !== null} transparent animationType="fade" onRequestClose={() => setEventToLeave(null)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Leave event?</Text>
-            <Text style={styles.modalText}>
-              {eventToLeave ? `Remove yourself from "${eventToLeave.title}"?` : ""}
-            </Text>
-            {actionError ? <Text style={styles.modalError}>{actionError}</Text> : null}
-            <View style={styles.modalActions}>
-              <Pressable
-                style={styles.modalSecondaryButton}
-                onPress={() => {
-                  if (processingEventId === null) {
-                    setEventToLeave(null);
-                    setActionError(null);
-                  }
-                }}
-                disabled={processingEventId !== null}
-              >
-                <Text style={styles.modalSecondaryButtonText}>Stay</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.modalDangerButton, processingEventId !== null && styles.secondaryButtonDisabled]}
-                onPress={() => {
-                  if (eventToLeave) {
-                    void handleLeave(eventToLeave.id);
-                  }
-                }}
-                disabled={processingEventId !== null}
-              >
-                <Text style={styles.modalDangerButtonText}>
-                  {processingEventId !== null ? "Leaving..." : "Leave"}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </ScrollView>
   );
 }
@@ -220,10 +145,12 @@ const styles = StyleSheet.create({
     padding: 16,
     marginTop: 12,
   },
-  eventHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
-  eventTitle: { fontSize: 16, fontWeight: "700", color: "#241f1c", marginBottom: 4, flex: 1, marginRight: 8 },
-  eventDescription: { fontSize: 13, color: "#5f5145", marginBottom: 6, lineHeight: 19 },
-  eventMeta: { fontSize: 13, color: "#6f6258" },
+  eventSummaryRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  eventSummaryText: { flex: 1 },
+  eventTitle: { fontSize: 16, fontWeight: "700", color: "#241f1c", marginBottom: 4 },
+  eventMeta: { fontSize: 13, color: "#6f6258", lineHeight: 19 },
+  eventArrow: { color: "#4f4339", fontSize: 28, fontWeight: "500" },
+  pressed: { opacity: 0.88 },
   visibilityBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 1 },
   publicBadge: { backgroundColor: "#eef3e8", borderColor: "#d3ddc8" },
   privateBadge: { backgroundColor: "#f3eee7", borderColor: "#e2d6c6" },

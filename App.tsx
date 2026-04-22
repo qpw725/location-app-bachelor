@@ -21,6 +21,7 @@ import AttendingEventsScreen from "./src/screens/AttendingEventsScreen";
 import HostingEventsScreen from "./src/screens/HostingEventsScreen";
 import PastEventsScreen from "./src/screens/PastEventsScreen";
 import EventMapScreen from "./src/screens/EventMapScreen";
+import EventDetailsScreen from "./src/screens/EventDetailsScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
 import RegisterProfileScreen from "./src/screens/RegisterProfileScreen";
@@ -70,6 +71,11 @@ export type RootStackParamList = {
   EventMap: {
     eventId: string;
     eventTitle: string;
+  };
+  EventDetails: {
+    eventId: string;
+    eventTitle: string;
+    mode: "attending" | "hosting" | "past";
   };
 };
 
@@ -280,6 +286,11 @@ export default function App() {
             name="EventMap"
             component={EventMapScreen}
             options={{ title: "Event map", headerBackTitle: "Events" }}
+          />
+          <Stack.Screen
+            name="EventDetails"
+            component={EventDetailsScreen}
+            options={{ title: "Event details", headerBackTitle: "Events" }}
           />
         </Stack.Navigator>
       ) : (
