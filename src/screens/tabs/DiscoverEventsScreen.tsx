@@ -12,16 +12,12 @@ import {
 import * as Location from "expo-location";
 import Slider from "@react-native-community/slider";
 import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
-import { CompositeScreenProps, useFocusEffect } from "@react-navigation/native";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { MainTabParamList, RootStackParamList } from "../../App";
-import EventAttendeeSection from "../components/EventAttendeeSection";
-import { fetchEventBuckets, joinPublicEvent, type EventItem } from "../data/eventStore";
+import { useFocusEffect } from "@react-navigation/native";
+import type { MainTabParamList } from "../../../App";
+import EventAttendeeSection from "../../components/EventAttendeeSection";
+import { fetchEventBuckets, joinPublicEvent, type EventItem } from "../../data/eventStore";
 
-type Props = CompositeScreenProps<
-  BottomTabScreenProps<MainTabParamList, "Events">,
-  NativeStackScreenProps<RootStackParamList>
->;
+type Props = BottomTabScreenProps<MainTabParamList, "DiscoverEvents">;
 
 const MAX_DISTANCE_KM = 160;
 
@@ -41,27 +37,7 @@ function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   return 2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function MyEventPreviewCard({ title, description, time, place, host, genre, visibility }: EventItem) {
-  return (
-    <View style={styles.previewEventCard}>
-      <View style={styles.eventHeader}>
-        <Text style={styles.eventTitle}>{title}</Text>
-        <View style={[styles.visibilityBadge, visibility === "Public" ? styles.publicBadge : styles.privateBadge]}>
-          <Text style={styles.visibilityText}>{visibility}</Text>
-        </View>
-      </View>
-      <Text style={styles.eventDescription} numberOfLines={2}>{description}</Text>
-      <Text style={styles.eventMeta}>{time}</Text>
-      <Text style={styles.eventMeta}>{place}</Text>
-      <View style={styles.discoverFooter}>
-        <Text style={styles.discoverHost}>{host}</Text>
-        <Text style={styles.discoverVibe}>{genre}</Text>
-      </View>
-    </View>
-  );
-}
-
-function DiscoverEventCard({
+function PublicEventCard({
   id,
   title,
   description,
@@ -99,39 +75,7 @@ function DiscoverEventCard({
   );
 }
 
-function CategoryCard({
-  label,
-  count,
-  preview,
-  onPress,
-}: {
-  label: string;
-  count: number;
-  preview?: EventItem;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.categoryCard, pressed && styles.pressed]}>
-      <View style={styles.categoryHeader}>
-        <View>
-          <Text style={styles.categoryLabel}>{label}</Text>
-          <Text style={styles.categoryCount}>{count} events</Text>
-        </View>
-      </View>
-
-      {preview ? (
-        <View style={styles.previewWrap}>
-          <MyEventPreviewCard {...preview} />
-        </View>
-      ) : (
-        <Text style={styles.emptyPreview}>No events yet</Text>
-      )}
-    </Pressable>
-  );
-}
-
-export default function EventsScreen({ navigation }: Props) {
-  const [activeView, setActiveView] = useState<"myEvents" | "discover">("myEvents");
+export default function DiscoverEventsScreen(_props: Props) {
   const [discoverSearch, setDiscoverSearch] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [timeFilter, setTimeFilter] = useState<"Any" | "Today" | "This Week">("Any");
@@ -140,8 +84,6 @@ export default function EventsScreen({ navigation }: Props) {
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [publicEvents, setPublicEvents] = useState<EventItem[]>([]);
   const [invitedEvents, setInvitedEvents] = useState<EventItem[]>([]);
-  const [hostingEvents, setHostingEvents] = useState<EventItem[]>([]);
-  const [pastEvents, setPastEvents] = useState<EventItem[]>([]);
   const [joiningEventId, setJoiningEventId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationFilterMessage, setLocationFilterMessage] = useState<string | null>(null);
@@ -210,8 +152,6 @@ export default function EventsScreen({ navigation }: Props) {
 
     setPublicEvents(data.publicEvents);
     setInvitedEvents(data.attendingEvents);
-    setHostingEvents(data.hostingEvents);
-    setPastEvents(data.pastEvents);
     setLoadingEvents(false);
   }, []);
 
@@ -262,7 +202,7 @@ export default function EventsScreen({ navigation }: Props) {
       (timeFilter === "This Week" && !!start && start >= todayStart && start < weekEnd);
 
     return matchesSearch && matchesCategory && matchesLocation && matchesTime;
-  }, [discoverSearch, distanceFilterKm, publicEvents, selectedCategories, timeFilter, userLocation]);
+  });
 
   const discoverList = useMemo(() => {
     const seen = new Set<string>();
@@ -313,9 +253,9 @@ export default function EventsScreen({ navigation }: Props) {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
     >
       <View style={styles.hero}>
-        <Text style={styles.heroEyebrow}>Events</Text>
-        <Text style={styles.heroTitle}>Your plans and new ones to explore</Text>
-        <Text style={styles.heroSubtitle}>Browse your own plans or explore public events that match your mood.</Text>
+        <Text style={styles.heroEyebrow}>Discover</Text>
+        <Text style={styles.heroTitle}>Find public events</Text>
+        <Text style={styles.heroSubtitle}>Search nearby plans, filter by mood, and join the ones that fit your day.</Text>
       </View>
 
       {loadingEvents ? (
@@ -331,139 +271,99 @@ export default function EventsScreen({ navigation }: Props) {
         </View>
       ) : null}
 
-      <View style={styles.segmentedControl}>
-        <Pressable
-          style={[styles.segment, activeView === "myEvents" && styles.segmentActive]}
-          onPress={() => setActiveView("myEvents")}
-        >
-          <Text style={[styles.segmentText, activeView === "myEvents" && styles.segmentTextActive]}>My Events</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.segment, activeView === "discover" && styles.segmentActive]}
-          onPress={() => setActiveView("discover")}
-        >
-          <Text style={[styles.segmentText, activeView === "discover" && styles.segmentTextActive]}>Discover</Text>
-        </Pressable>
+      <TextInput
+        value={discoverSearch}
+        onChangeText={setDiscoverSearch}
+        placeholder="Search events"
+        placeholderTextColor="#7a869b"
+        style={styles.searchInput}
+      />
+
+      <View style={styles.filterBlock}>
+        <Text style={styles.filterLabel}>Categories</Text>
+        <View style={styles.filterRow}>
+          {categoryOptions.map((category) => (
+            <Pressable
+              key={category}
+              style={[
+                styles.filterChip,
+                selectedCategories.includes(category) && styles.filterChipActive,
+              ]}
+              onPress={() => toggleCategory(category)}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  selectedCategories.includes(category) && styles.filterChipTextActive,
+                ]}
+              >
+                {category}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <View style={styles.distanceSection}>
+          <View style={styles.distanceHeader}>
+            <Text style={styles.filterLabel}>Distance</Text>
+            <Text style={styles.distanceValue}>{distanceFilterKm} km</Text>
+          </View>
+          <Slider
+            style={styles.slider}
+            minimumValue={0}
+            maximumValue={MAX_DISTANCE_KM}
+            step={1}
+            value={distanceFilterKm}
+            minimumTrackTintColor="#2f5d50"
+            maximumTrackTintColor="#efe4d7"
+            thumbTintColor="#2f5d50"
+            onSlidingStart={() => {
+              if (!userLocation) {
+                void loadUserLocation(true);
+              }
+            }}
+            onValueChange={(value) => {
+              setDistanceFilterKm(Math.round(value));
+            }}
+          />
+          <View style={styles.distanceScale}>
+            <Text style={styles.distanceScaleText}>0 km</Text>
+            <Text style={styles.distanceScaleText}>{MAX_DISTANCE_KM} km</Text>
+          </View>
+        </View>
+        {locationFilterMessage ? <Text style={styles.filterHelpText}>{locationFilterMessage}</Text> : null}
+
+        <Text style={styles.filterLabel}>Time / Date</Text>
+        <View style={styles.filterRow}>
+          {(["Any", "Today", "This Week"] as const).map((option) => (
+            <Pressable
+              key={option}
+              style={[styles.filterChip, timeFilter === option && styles.filterChipActive]}
+              onPress={() => setTimeFilter(option)}
+            >
+              <Text style={[styles.filterChipText, timeFilter === option && styles.filterChipTextActive]}>
+                {option}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
 
-      {activeView === "myEvents" ? (
-        <View style={styles.section}>
-          <CategoryCard
-            label="Attending"
-            count={invitedEvents.length}
-            preview={invitedEvents[0]}
-            onPress={() => navigation.navigate("AttendingEvents")}
-          />
-          <CategoryCard
-            label="Hosting"
-            count={hostingEvents.length}
-            preview={hostingEvents[0]}
-            onPress={() => navigation.navigate("HostingEvents")}
-          />
-          <CategoryCard
-            label="Past"
-            count={pastEvents.length}
-            preview={pastEvents[0]}
-            onPress={() => navigation.navigate("PastEvents")}
-          />
-        </View>
-      ) : (
-        <View style={styles.section}>
-          <TextInput
-            value={discoverSearch}
-            onChangeText={setDiscoverSearch}
-            placeholder="Search events"
-            placeholderTextColor="#7a869b"
-            style={styles.searchInput}
-          />
-
-          <View style={styles.filterBlock}>
-            <Text style={styles.filterLabel}>Categories</Text>
-            <View style={styles.filterRow}>
-              {categoryOptions.map((category) => (
-                <Pressable
-                  key={category}
-                  style={[
-                    styles.filterChip,
-                    selectedCategories.includes(category) && styles.filterChipActive,
-                  ]}
-                  onPress={() => toggleCategory(category)}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      selectedCategories.includes(category) && styles.filterChipTextActive,
-                    ]}
-                  >
-                    {category}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <View style={styles.distanceSection}>
-              <View style={styles.distanceHeader}>
-                <Text style={styles.filterLabel}>Distance</Text>
-                <Text style={styles.distanceValue}>{distanceFilterKm} km</Text>
-              </View>
-              <Slider
-                style={styles.slider}
-                minimumValue={0}
-                maximumValue={MAX_DISTANCE_KM}
-                step={1}
-                value={distanceFilterKm}
-                minimumTrackTintColor="#2f5d50"
-                maximumTrackTintColor="#efe4d7"
-                thumbTintColor="#2f5d50"
-                onSlidingStart={() => {
-                  if (!userLocation) {
-                    void loadUserLocation(true);
-                  }
-                }}
-                onValueChange={(value) => {
-                  setDistanceFilterKm(Math.round(value));
-                }}
-              />
-              <View style={styles.distanceScale}>
-                <Text style={styles.distanceScaleText}>0 km</Text>
-                <Text style={styles.distanceScaleText}>{MAX_DISTANCE_KM} km</Text>
-              </View>
-            </View>
-            {locationFilterMessage ? <Text style={styles.filterHelpText}>{locationFilterMessage}</Text> : null}
-
-            <Text style={styles.filterLabel}>Time / Date</Text>
-            <View style={styles.filterRow}>
-              {(["Any", "Today", "This Week"] as const).map((option) => (
-                <Pressable
-                  key={option}
-                  style={[styles.filterChip, timeFilter === option && styles.filterChipActive]}
-                  onPress={() => setTimeFilter(option)}
-                >
-                  <Text style={[styles.filterChipText, timeFilter === option && styles.filterChipTextActive]}>
-                    {option}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-
-          <Text style={styles.sectionTitle}>Discover public events</Text>
-          {discoverList.map((event) => (
-            <DiscoverEventCard
-              key={event.id}
-              {...event}
-              joining={joiningEventId === event.id}
-              onJoin={() => {
-                void handleJoinEvent(event.id);
-              }}
-            />
-          ))}
-          {discoverList.length === 0 && (
-            <View style={styles.discoverCard}>
-              <Text style={styles.eventTitle}>No events match your filters</Text>
-              <Text style={styles.eventMeta}>Try changing search text or filters.</Text>
-            </View>
-          )}
+      <Text style={styles.sectionTitle}>Public events</Text>
+      {discoverList.map((event) => (
+        <PublicEventCard
+          key={event.id}
+          {...event}
+          joining={joiningEventId === event.id}
+          onJoin={() => {
+            void handleJoinEvent(event.id);
+          }}
+        />
+      ))}
+      {discoverList.length === 0 && (
+        <View style={styles.discoverCard}>
+          <Text style={styles.eventTitle}>No events match your filters</Text>
+          <Text style={styles.eventMeta}>Try changing search text or filters.</Text>
         </View>
       )}
     </ScrollView>
@@ -498,28 +398,6 @@ const styles = StyleSheet.create({
   },
   heroTitle: { color: "#1f1a17", fontSize: 28, fontWeight: "800", marginBottom: 8 },
   heroSubtitle: { color: "#67594d", fontSize: 15, lineHeight: 22, maxWidth: "92%" },
-  segmentedControl: {
-    flexDirection: "row",
-    backgroundColor: "#efe6da",
-    borderRadius: 18,
-    padding: 4,
-    marginBottom: 18,
-  },
-  segment: {
-    flex: 1,
-    borderRadius: 14,
-    paddingVertical: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  segmentActive: {
-    backgroundColor: "#fffaf4",
-    borderWidth: 1,
-    borderColor: "#eadfce",
-  },
-  segmentText: { fontSize: 14, fontWeight: "600", color: "#6f6258" },
-  segmentTextActive: { color: "#201c19" },
-  section: { marginBottom: 20 },
   sectionTitle: { fontSize: 20, fontWeight: "700", color: "#201c19", marginBottom: 10 },
   searchInput: {
     backgroundColor: "#fffaf4",
@@ -609,59 +487,9 @@ const styles = StyleSheet.create({
   filterChipTextActive: {
     color: "#ffffff",
   },
-  categoryCard: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    padding: 16,
-    marginBottom: 12,
-  },
-  categoryHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  categoryLabel: { fontSize: 18, fontWeight: "700", color: "#201c19" },
-  categoryCount: { marginTop: 2, fontSize: 13, color: "#6f6258" },
-  previewWrap: { marginTop: 10 },
-  emptyPreview: { marginTop: 10, fontSize: 13, color: "#8a7f74" },
-  pressed: { opacity: 0.88 },
-  previewEventCard: {
-    backgroundColor: "#fff6ea",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    padding: 12,
-  },
-  eventHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
   eventTitle: { fontSize: 16, fontWeight: "700", color: "#241f1c", marginBottom: 4 },
   eventMeta: { fontSize: 13, color: "#6f6258" },
   eventDescription: { fontSize: 13, color: "#5f5145", marginBottom: 6, lineHeight: 19 },
-  visibilityBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  publicBadge: {
-    backgroundColor: "#eef3e8",
-    borderColor: "#d3ddc8",
-  },
-  privateBadge: {
-    backgroundColor: "#f3eee7",
-    borderColor: "#e2d6c6",
-  },
-  visibilityText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#4f4339",
-  },
   discoverCard: {
     backgroundColor: "#fffaf4",
     borderRadius: 22,

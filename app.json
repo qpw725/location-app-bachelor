@@ -35,7 +35,12 @@
     },
     "plugins": [
       "@react-native-community/datetimepicker",
-      "expo-notifications",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Allow this app to add events to your calendar."
+        }
+      ],
       [
         "expo-location",
         {

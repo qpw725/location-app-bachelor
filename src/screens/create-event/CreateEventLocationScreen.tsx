@@ -11,10 +11,10 @@ import {
 } from "react-native";
 import MapView, { Marker, Region } from "react-native-maps";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { EventLocation, RootStackParamList } from "../../App";
-import StepIndicator from "../components/StepIndicator";
+import type { EventLocation, RootStackParamList } from "../../../App";
+import StepIndicator from "../../components/StepIndicator";
 
-type Props = NativeStackScreenProps<RootStackParamList, "ChooseLocation">;
+type Props = NativeStackScreenProps<RootStackParamList, "CreateEventLocation">;
 
 type NominatimResult = {
   place_id: number;
@@ -23,7 +23,7 @@ type NominatimResult = {
   lon: string;
 };
 
-export default function ChooseLocationScreen({ navigation, route }: Props) {
+export default function CreateEventLocationScreen({ navigation, route }: Props) {
   const { eventName, eventDescription, eventTime, eventEndTime, eventDate } = route.params;
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NominatimResult[]>([]);
@@ -134,7 +134,7 @@ export default function ChooseLocationScreen({ navigation, route }: Props) {
 
   function goNext() {
     if (!selected) return;
-    navigation.navigate("EventOverview", { eventName, eventDescription, location: selected, eventTime, eventEndTime, eventDate });
+    navigation.navigate("CreateEventInvite", { eventName, eventDescription, location: selected, eventTime, eventEndTime, eventDate });
   }
 
   return (

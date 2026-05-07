@@ -6,26 +6,25 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { Session } from "@supabase/supabase-js";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import * as Notifications from "expo-notifications";
 
-import StartScreen from "./src/screens/StartScreen";
-import EventsScreen from "./src/screens/EventsScreen";
-import InboxScreen from "./src/screens/InboxScreen";
-import CreateEventDetailsScreen from "./src/screens/CreateEventDetailsScreen";
-import ChooseLocationScreen from "./src/screens/ChooseLocationScreen";
-import EventOverviewScreen from "./src/screens/EventOverviewScreen";
-import MyProfileScreen from "./src/screens/MyProfileScreen";
-import EditProfileScreen from "./src/screens/EditProfileScreen";
-import NotificationSettingsScreen from "./src/screens/NotificationSettingsScreen";
-import AttendingEventsScreen from "./src/screens/AttendingEventsScreen";
-import HostingEventsScreen from "./src/screens/HostingEventsScreen";
-import PastEventsScreen from "./src/screens/PastEventsScreen";
-import EventMapScreen from "./src/screens/EventMapScreen";
-import LoginScreen from "./src/screens/LoginScreen";
-import RegisterScreen from "./src/screens/RegisterScreen";
-import RegisterProfileScreen from "./src/screens/RegisterProfileScreen";
+import HomeScreen from "./src/screens/tabs/HomeScreen";
+import MyEventsScreen from "./src/screens/tabs/MyEventsScreen";
+import DiscoverEventsScreen from "./src/screens/tabs/DiscoverEventsScreen";
+import InboxScreen from "./src/screens/tabs/InboxScreen";
+import CreateEventDetailsScreen from "./src/screens/create-event/CreateEventDetailsScreen";
+import CreateEventLocationScreen from "./src/screens/create-event/CreateEventLocationScreen";
+import CreateEventInviteScreen from "./src/screens/create-event/CreateEventInviteScreen";
+import ProfileScreen from "./src/screens/tabs/ProfileScreen";
+import EditProfileScreen from "./src/screens/profile/EditProfileScreen";
+import AttendingEventsScreen from "./src/screens/events/AttendingEventsScreen";
+import HostingEventsScreen from "./src/screens/events/HostingEventsScreen";
+import PastEventsScreen from "./src/screens/events/PastEventsScreen";
+import EventDetailsScreen from "./src/screens/events/EventDetailsScreen";
+import LiveEventMapScreen from "./src/screens/events/LiveEventMapScreen";
+import LoginScreen from "./src/screens/auth/LoginScreen";
+import RegisterScreen from "./src/screens/auth/RegisterScreen";
+import RegisterProfileScreen from "./src/screens/auth/RegisterProfileScreen";
 import { initializeEventLocationSharing } from "./src/locationSharingManager";
-import { syncPushTokenForCurrentUser } from "./src/notifications";
 import { supabase } from "./src/supabase";
 
 
@@ -48,7 +47,6 @@ export type EventDate = {
 
 export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList>;
-  NotificationSettings: undefined;
   EditProfile:
     | {
         initialField?: "username" | "name" | "email" | "password";
@@ -57,9 +55,13 @@ export type RootStackParamList = {
   AttendingEvents: undefined;
   HostingEvents: undefined;
   PastEvents: undefined;
+  EventDetails: {
+    eventId: string;
+    source: "attending" | "hosting" | "past";
+  };
   CreateEventDetails: undefined;
-  ChooseLocation: { eventName: string; eventDescription?: string; eventTime: EventTime; eventEndTime: EventTime; eventDate: EventDate };
-  EventOverview: {
+  CreateEventLocation: { eventName: string; eventDescription?: string; eventTime: EventTime; eventEndTime: EventTime; eventDate: EventDate };
+  CreateEventInvite: {
     eventName: string;
     eventDescription?: string;
     location: EventLocation;
@@ -67,17 +69,18 @@ export type RootStackParamList = {
     eventEndTime: EventTime;
     eventDate: EventDate;
   };
-  EventMap: {
+  LiveEventMap: {
     eventId: string;
     eventTitle: string;
   };
 };
 
 export type MainTabParamList = {
-  Start: undefined;
-  Events: undefined;
+  Home: undefined;
+  MyEvents: undefined;
+  DiscoverEvents: undefined;
   Inbox: undefined;
-  MyProfile: undefined;
+  Profile: undefined;
 };
 
 type AuthStackParamList = {
@@ -92,15 +95,6 @@ type AuthStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
 
 const sharedHeaderOptions = {
   headerStyle: {
@@ -138,13 +132,15 @@ function MainTabs() {
         tabBarIcon: ({ color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap = "home";
 
-          if (route.name === "Start") {
+          if (route.name === "Home") {
             iconName = "home";
-          } else if (route.name === "Events") {
+          } else if (route.name === "MyEvents") {
             iconName = "calendar";
+          } else if (route.name === "DiscoverEvents") {
+            iconName = "search";
           } else if (route.name === "Inbox") {
             iconName = "mail";
-          } else if (route.name === "MyProfile") {
+          } else if (route.name === "Profile") {
             iconName = "person";
           }
 
@@ -159,10 +155,11 @@ function MainTabs() {
         ...sharedHeaderOptions,
       })}
     >
-      <Tab.Screen name="Start" component={StartScreen} options={{ title: "Home", headerTitle: "Home" }} />
-      <Tab.Screen name="Events" component={EventsScreen} options={{ title: "Events", headerTitle: "Events" }} />
+      <Tab.Screen name="Home" component={HomeScreen} options={{ title: "Home", headerTitle: "Home" }} />
+      <Tab.Screen name="MyEvents" component={MyEventsScreen} options={{ title: "My Events", headerTitle: "My Events" }} />
+      <Tab.Screen name="DiscoverEvents" component={DiscoverEventsScreen} options={{ title: "Discover", headerTitle: "Discover" }} />
       <Tab.Screen name="Inbox" component={InboxScreen} options={{ title: "Inbox", headerTitle: "Inbox" }} />
-      <Tab.Screen name="MyProfile" component={MyProfileScreen} options={{ title: "Profile", headerTitle: "My profile" }} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile", headerTitle: "Profile" }} />
     </Tab.Navigator>
   );
 }
@@ -177,7 +174,6 @@ export default function App() {
     }
 
     void initializeEventLocationSharing();
-    void syncPushTokenForCurrentUser();
   }, [session]);
 
   useEffect(() => {
@@ -237,11 +233,6 @@ export default function App() {
         <Stack.Navigator initialRouteName="MainTabs" screenOptions={sharedHeaderOptions}>
           <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
           <Stack.Screen
-            name="NotificationSettings"
-            component={NotificationSettingsScreen}
-            options={{ title: "Notifications", headerBackTitle: "Profile" }}
-          />
-          <Stack.Screen
             name="EditProfile"
             component={EditProfileScreen}
             options={{ title: "Edit profile", headerBackTitle: "Profile" }}
@@ -262,23 +253,28 @@ export default function App() {
             options={{ title: "Past", headerBackTitle: "Events" }}
           />
           <Stack.Screen
+            name="EventDetails"
+            component={EventDetailsScreen}
+            options={{ title: "Event details", headerBackTitle: "Events" }}
+          />
+          <Stack.Screen
             name="CreateEventDetails"
             component={CreateEventDetailsScreen}
             options={{ title: "Create event and time", headerBackTitle: "Home" }}
           />
           <Stack.Screen
-            name="ChooseLocation"
-            component={ChooseLocationScreen}
+            name="CreateEventLocation"
+            component={CreateEventLocationScreen}
             options={{ title: "Location", headerBackTitle: "Event details" }}
           />
           <Stack.Screen
-            name="EventOverview"
-            component={EventOverviewScreen}
+            name="CreateEventInvite"
+            component={CreateEventInviteScreen}
             options={{ title: "Event", headerBackTitle: "Location" }}
           />
           <Stack.Screen
-            name="EventMap"
-            component={EventMapScreen}
+            name="LiveEventMap"
+            component={LiveEventMapScreen}
             options={{ title: "Event map", headerBackTitle: "Events" }}
           />
         </Stack.Navigator>

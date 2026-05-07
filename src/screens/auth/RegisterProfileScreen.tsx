@@ -2,7 +2,7 @@ import { useState } from "react";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { getSupabaseDebugInfo, supabase, testSupabaseConnection } from "../supabase";
+import { getSupabaseDebugInfo, supabase, testSupabaseConnection } from "../../supabase";
 
 type AuthStackParamList = {
   Login: undefined;

@@ -1,7 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import { stopSharingMyEventLocation, upsertMyEventLiveLocation } from "./data/eventLiveLocation";
-import { maybeNotifyEventArrival } from "./notifications";
 
 const STORAGE_KEY = "active_event_location_shares";
 
@@ -85,15 +84,6 @@ async function broadcastLocation(latitude: number, longitude: number) {
       continue;
     }
 
-    const arrivalResult = await maybeNotifyEventArrival({
-      eventId: share.eventId,
-      latitude,
-      longitude,
-    });
-
-    if (arrivalResult.error) {
-      console.warn(`[LocationSharing] Failed to notify arrival for ${share.eventId}:`, arrivalResult.error);
-    }
   }
 }
 

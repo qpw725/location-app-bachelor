@@ -3,12 +3,12 @@ import { Alert, View, Text, StyleSheet, Pressable, ScrollView } from "react-nati
 import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { CompositeScreenProps, useFocusEffect } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { MainTabParamList, RootStackParamList } from "../../App";
-import ProfileAvatar from "../components/ProfileAvatar";
-import { CurrentProfile, fetchCurrentProfile, getProfileInitials, pickAndUploadAvatar, removeAvatar } from "../profile";
-import { supabase } from "../supabase";
+import type { MainTabParamList, RootStackParamList } from "../../../App";
+import ProfileAvatar from "../../components/ProfileAvatar";
+import { CurrentProfile, fetchCurrentProfile, getProfileInitials, pickAndUploadAvatar, removeAvatar } from "../../profile";
+import { supabase } from "../../supabase";
 
-type Props = CompositeScreenProps<BottomTabScreenProps<MainTabParamList, "MyProfile">, NativeStackScreenProps<RootStackParamList>>;
+type Props = CompositeScreenProps<BottomTabScreenProps<MainTabParamList, "Profile">, NativeStackScreenProps<RootStackParamList>>;
 
 const defaultProfile: CurrentProfile = {
   id: "",
@@ -20,10 +20,9 @@ const defaultProfile: CurrentProfile = {
   memberSince: "Unknown",
   avatarPath: null,
   avatarUrl: null,
-  eventNotificationsEnabled: true,
 };
 
-export default function MyProfileScreen({ navigation }: Props) {
+export default function ProfileScreen({ navigation }: Props) {
   const [profile, setProfile] = useState<CurrentProfile>(defaultProfile);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [avatarMessage, setAvatarMessage] = useState<string | null>(null);
@@ -185,13 +184,6 @@ export default function MyProfileScreen({ navigation }: Props) {
         <Text style={styles.sectionTitle}>Settings</Text>
         <Pressable
           style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}
-          onPress={() => navigation.navigate("NotificationSettings")}
-        >
-          <Text style={styles.settingsText}>Notifications</Text>
-          <Text style={styles.settingsValue}>{profile.eventNotificationsEnabled ? "On" : "Off"}</Text>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.settingsRow, styles.infoSpacing, pressed && styles.pressed]}
           onPress={handleSignOut}
         >
           <Text style={[styles.settingsText, styles.signOutText]}>Log off</Text>
@@ -324,9 +316,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "800",
   },
-  infoSpacing: {
-    marginTop: 10,
-  },
   settingsRow: {
     borderRadius: 22,
     backgroundColor: "#fffaf4",
@@ -342,11 +331,6 @@ const styles = StyleSheet.create({
     color: "#201c19",
     fontWeight: "700",
     flex: 1,
-  },
-  settingsValue: {
-    fontSize: 13,
-    color: "#6f6258",
-    fontWeight: "700",
   },
   signOutText: {
     color: "#b33737",

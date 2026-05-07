@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, ActivityIndicator, RefreshControl, Modal } from "react-native";
-import { supabase } from "../supabase";
+import { supabase } from "../../supabase";
 
 type InboxItemStatus = "pending" | "accepted" | "declined";
 

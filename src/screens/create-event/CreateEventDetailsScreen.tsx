@@ -11,8 +11,8 @@ import {
 } from "react-native";
 import { useState } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { RootStackParamList } from "../../App";
-import StepIndicator from "../components/StepIndicator";
+import type { RootStackParamList } from "../../../App";
+import StepIndicator from "../../components/StepIndicator";
 
 
 type Props = NativeStackScreenProps<RootStackParamList, "CreateEventDetails">;
@@ -258,7 +258,7 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
         <Pressable
           style={({ pressed }) => [styles.primaryButton, (!canContinue || pressed) && styles.primaryButtonPressed, !canContinue && styles.primaryButtonDisabled]}
           onPress={() =>
-            navigation.navigate("ChooseLocation", {
+            navigation.navigate("CreateEventLocation", {
               eventName: eventName.trim(),
               eventDescription: eventDescription.trim() || undefined,
               eventDate: {

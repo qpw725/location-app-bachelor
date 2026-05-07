@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import MapView, { Marker, Region } from "react-native-maps";
-import type { RootStackParamList } from "../../App";
+import type { RootStackParamList } from "../../../App";
 import {
   fetchEventLiveParticipants,
   fetchEventMapDetails,
@@ -10,11 +10,11 @@ import {
   isEventShareWindowOpen,
   type EventMapDetails,
   type LiveEventParticipant,
-} from "../data/eventLiveLocation";
-import { startEventLocationSharing, stopEventLocationSharing } from "../locationSharingManager";
-import { supabase } from "../supabase";
+} from "../../data/eventLiveLocation";
+import { startEventLocationSharing, stopEventLocationSharing } from "../../locationSharingManager";
+import { supabase } from "../../supabase";
 
-type Props = NativeStackScreenProps<RootStackParamList, "EventMap">;
+type Props = NativeStackScreenProps<RootStackParamList, "LiveEventMap">;
 
 const DEFAULT_REGION: Region = {
   latitude: 55.6761,
@@ -23,7 +23,7 @@ const DEFAULT_REGION: Region = {
   longitudeDelta: 0.08,
 };
 
-export default function EventMapScreen({ route }: Props) {
+export default function LiveEventMapScreen({ route }: Props) {
   const { eventId, eventTitle } = route.params;
   const [eventDetails, setEventDetails] = useState<EventMapDetails | null>(null);
   const [participants, setParticipants] = useState<LiveEventParticipant[]>([]);
@@ -224,16 +224,29 @@ export default function EventMapScreen({ route }: Props) {
               }}
               title="Event location"
               description={eventDetails.locationLabel}
-              pinColor="#1f4fa3"
-            />
+              tracksViewChanges={false}
+              zIndex={1000}
+            >
+              <View style={styles.eventMarker}>
+                <View style={styles.eventMarkerDot} />
+              </View>
+            </Marker>
             {participants.map((participant) => (
               <Marker
                 key={participant.id}
                 coordinate={{ latitude: participant.latitude, longitude: participant.longitude }}
                 title={participant.name}
                 description={participant.username ? `@${participant.username}` : "Live attendee"}
-                pinColor="#d97706"
-              />
+                tracksViewChanges={false}
+              >
+                <View style={styles.avatarMarker}>
+                  {participant.avatarUrl ? (
+                    <Image source={{ uri: participant.avatarUrl }} style={styles.avatarMarkerImage} resizeMode="cover" />
+                  ) : (
+                    <Text style={styles.avatarMarkerText}>{participant.initials}</Text>
+                  )}
+                </View>
+              </Marker>
             ))}
           </MapView>
         </View>
@@ -287,23 +300,72 @@ export default function EventMapScreen({ route }: Props) {
         ) : (
           participants.map((participant) => (
             <View key={participant.id} style={styles.participantRow}>
+              <View style={styles.participantAvatar}>
+                {participant.avatarUrl ? (
+                  <Image source={{ uri: participant.avatarUrl }} style={styles.participantAvatarImage} resizeMode="cover" />
+                ) : (
+                  <Text style={styles.participantAvatarText}>{participant.initials}</Text>
+                )}
+              </View>
               <View style={styles.participantTextWrap}>
                 <Text style={styles.participantName}>{participant.name}</Text>
                 <Text style={styles.participantMeta}>
                   {participant.username ? `@${participant.username}` : "Attendee"}
                 </Text>
               </View>
-              <Text style={styles.participantMeta}>
-                {participant.updatedAt
-                  ? new Date(participant.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                  : "Live"}
-              </Text>
+                <Text style={styles.participantMeta}>
+                  {formatParticipantStatus(participant, eventDetails)}
+                </Text>
             </View>
           ))
         )}
       </View>
     </ScrollView>
   );
+}
+
+function formatParticipantStatus(participant: LiveEventParticipant, eventDetails: EventMapDetails | null) {
+  const updatedLabel = participant.updatedAt
+    ? new Date(participant.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : "Live";
+  const distanceLabel = getDistanceLabel(participant, eventDetails);
+
+  return distanceLabel ? `${updatedLabel} • ${distanceLabel}` : updatedLabel;
+}
+
+function getDistanceLabel(participant: LiveEventParticipant, eventDetails: EventMapDetails | null) {
+  if (!eventDetails || !hasEventMapCoordinates(eventDetails)) {
+    return null;
+  }
+
+  const meters = getDistanceMeters(
+    participant.latitude,
+    participant.longitude,
+    eventDetails.eventLatitude!,
+    eventDetails.eventLongitude!
+  );
+
+  if (meters < 1000) {
+    return `${Math.round(meters)} m away`;
+  }
+
+  return `${(meters / 1000).toFixed(1)} km away`;
+}
+
+function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+  const earthRadiusMeters = 6371000;
+
+  const dLat = toRadians(lat2 - lat1);
+  const dLon = toRadians(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(lat1)) *
+      Math.cos(toRadians(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+
+  return 2 * earthRadiusMeters * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 const styles = StyleSheet.create({
@@ -401,6 +463,52 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
   },
+  eventMarker: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 3,
+    borderColor: "#ffffff",
+    backgroundColor: "#1f4fa3",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.24,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  eventMarkerDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#ffffff",
+  },
+  avatarMarker: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 3,
+    borderColor: "#ffffff",
+    backgroundColor: "#e3e7ef",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  avatarMarkerImage: {
+    width: "100%",
+    height: "100%",
+  },
+  avatarMarkerText: {
+    color: "#1f4fa3",
+    fontSize: 13,
+    fontWeight: "800",
+  },
   shareCard: {
     backgroundColor: "#fffaf4",
     borderRadius: 22,
@@ -469,11 +577,29 @@ const styles = StyleSheet.create({
   },
   participantRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: "#efe4d7",
+  },
+  participantAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#e3e7ef",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    marginRight: 10,
+  },
+  participantAvatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+  participantAvatarText: {
+    color: "#1f4fa3",
+    fontSize: 13,
+    fontWeight: "800",
   },
   participantTextWrap: {
     flex: 1,

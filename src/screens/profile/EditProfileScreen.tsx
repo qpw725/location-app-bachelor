@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import type { RootStackParamList } from "../../App";
-import ProfileAvatar from "../components/ProfileAvatar";
-import { fetchCurrentProfile, getProfileInitials, pickAndUploadAvatar, removeAvatar } from "../profile";
-import { supabase } from "../supabase";
+import type { RootStackParamList } from "../../../App";
+import ProfileAvatar from "../../components/ProfileAvatar";
+import { fetchCurrentProfile, getProfileInitials, pickAndUploadAvatar, removeAvatar } from "../../profile";
+import { supabase } from "../../supabase";
 
 type Props = NativeStackScreenProps<RootStackParamList, "EditProfile">;
 

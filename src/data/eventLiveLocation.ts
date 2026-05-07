@@ -1,4 +1,5 @@
 import { supabase } from "../supabase";
+import { getAvatarPublicUrl } from "../profile";
 
 type EventMapRow = {
   id: string;
@@ -16,6 +17,7 @@ type ProfileRow = {
   username: string | null;
   first_name: string | null;
   last_name: string | null;
+  avatar_path: string | null;
 };
 
 type LiveLocationRow = {
@@ -41,6 +43,8 @@ export type LiveEventParticipant = {
   id: string;
   name: string;
   username: string;
+  initials: string;
+  avatarUrl: string | null;
   latitude: number;
   longitude: number;
   updatedAt: string | null;
@@ -55,6 +59,18 @@ function fullNameFromProfile(profile: ProfileRow | undefined) {
   const last = profile.last_name?.trim() ?? "";
   const fullName = `${first} ${last}`.trim();
   return fullName || profile.username?.trim() || "Unknown user";
+}
+
+function initialsFromProfile(profile: ProfileRow | undefined) {
+  const name = fullNameFromProfile(profile);
+  const initials = name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+
+  return initials || profile?.username?.trim().charAt(0).toUpperCase() || "?";
 }
 
 export function isEventShareWindowOpen(event: { startAt: Date | null; endAt: Date | null }, leadMinutes = 60) {
@@ -162,7 +178,7 @@ export async function fetchEventLiveParticipants(eventId: string): Promise<{ dat
   if (profileIds.length > 0) {
     const { data: profiles, error: profilesError } = await supabase
       .from("profiles")
-      .select("id, username, first_name, last_name")
+      .select("id, username, first_name, last_name, avatar_path")
       .in("id", profileIds);
 
     if (profilesError) {
@@ -180,6 +196,8 @@ export async function fetchEventLiveParticipants(eventId: string): Promise<{ dat
       id: row.user_id,
       name: fullNameFromProfile(profile),
       username: profile?.username?.trim() ?? "",
+      initials: initialsFromProfile(profile),
+      avatarUrl: getAvatarPublicUrl(profile?.avatar_path?.trim() || null),
       latitude: row.latitude,
       longitude: row.longitude,
       updatedAt: row.updated_at,

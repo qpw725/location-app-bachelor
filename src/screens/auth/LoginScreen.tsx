@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { getSupabaseDebugInfo, supabase, testSupabaseConnection } from "../supabase";
+import { getSupabaseDebugInfo, supabase, testSupabaseConnection } from "../../supabase";
 
 type AuthStackParamList = {
   Login: undefined;

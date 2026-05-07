@@ -11,11 +11,11 @@ import {
 } from "react-native";
 import { CommonActions } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { RootStackParamList } from "../../App";
-import StepIndicator from "../components/StepIndicator";
-import { supabase } from "../supabase";
+import type { RootStackParamList } from "../../../App";
+import StepIndicator from "../../components/StepIndicator";
+import { supabase } from "../../supabase";
 
-type Props = NativeStackScreenProps<RootStackParamList, "EventOverview">;
+type Props = NativeStackScreenProps<RootStackParamList, "CreateEventInvite">;
 
 type InvitedFriend = {
   id: string;
@@ -44,16 +44,12 @@ const categoryOptions = [
   "Culture",
   "Other",
 ];
-const frequencyOptions = ["Low", "Medium", "High"] as const;
 
-export default function EventOverviewScreen({ route, navigation }: Props) {
+export default function CreateEventInviteScreen({ route, navigation }: Props) {
   const { eventName, eventDescription, location, eventTime, eventEndTime, eventDate } = route.params;
 
   const [visibility, setVisibility] = useState<"Private" | "Public">("Private");
   const [selectedCategory, setSelectedCategory] = useState(categoryOptions[0]);
-  const [notifyLocationUpdates, setNotifyLocationUpdates] = useState(true);
-  const [notifyArrivalUpdates, setNotifyArrivalUpdates] = useState(true);
-  const [notificationFrequency, setNotificationFrequency] = useState<(typeof frequencyOptions)[number]>("Medium");
   const [inviteInput, setInviteInput] = useState("");
   const [invitedPeople, setInvitedPeople] = useState<InvitedFriend[]>([]);
   const [inviteError, setInviteError] = useState<string | null>(null);
@@ -383,7 +379,7 @@ export default function EventOverviewScreen({ route, navigation }: Props) {
     navigation.dispatch(
       CommonActions.reset({
         index: 0,
-        routes: [{ name: "MainTabs", params: { screen: "Events" } }],
+        routes: [{ name: "MainTabs", params: { screen: "MyEvents" } }],
       })
     );
   }
@@ -446,45 +442,6 @@ export default function EventOverviewScreen({ route, navigation }: Props) {
             ))}
           </View>
 
-          <Text style={styles.settingLabel}>Notification settings</Text>
-          <View style={styles.inlineSettingRow}>
-            <Text style={styles.inlineSettingText}>Notify about participant location updates</Text>
-            <Pressable
-              style={[styles.smallToggle, notifyLocationUpdates && styles.smallToggleActive]}
-              onPress={() => setNotifyLocationUpdates((prev) => !prev)}
-            >
-              <Text style={[styles.smallToggleText, notifyLocationUpdates && styles.smallToggleTextActive]}>
-                {notifyLocationUpdates ? "On" : "Off"}
-              </Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.inlineSettingRow}>
-            <Text style={styles.inlineSettingText}>Notify when participants are on the way or arrived</Text>
-            <Pressable
-              style={[styles.smallToggle, notifyArrivalUpdates && styles.smallToggleActive]}
-              onPress={() => setNotifyArrivalUpdates((prev) => !prev)}
-            >
-              <Text style={[styles.smallToggleText, notifyArrivalUpdates && styles.smallToggleTextActive]}>
-                {notifyArrivalUpdates ? "On" : "Off"}
-              </Text>
-            </Pressable>
-          </View>
-
-          <Text style={styles.settingLabel}>Notification frequency</Text>
-          <View style={styles.toggleRow}>
-            {frequencyOptions.map((option) => (
-              <Pressable
-                key={option}
-                style={[styles.optionChip, notificationFrequency === option && styles.optionChipActive]}
-                onPress={() => setNotificationFrequency(option)}
-              >
-                <Text style={[styles.optionChipText, notificationFrequency === option && styles.optionChipTextActive]}>
-                  {option}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
         </View>
 
         <View style={styles.card}>
@@ -625,28 +582,6 @@ const styles = StyleSheet.create({
   optionChipTextActive: {
     color: "#ffffff",
   },
-  inlineSettingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 10,
-    gap: 10,
-  },
-  inlineSettingText: { flex: 1, fontSize: 13, color: "#4f4339", lineHeight: 18 },
-  smallToggle: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: "#f6eee4",
-  },
-  smallToggleActive: {
-    backgroundColor: "#2f5d50",
-    borderColor: "#2f5d50",
-  },
-  smallToggleText: { color: "#5f5145", fontWeight: "700", fontSize: 12 },
-  smallToggleTextActive: { color: "#ffffff" },
   inviteRow: { flexDirection: "row", gap: 8, alignItems: "center" },
   input: {
     flex: 1,

@@ -2,19 +2,19 @@ import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { CompositeScreenProps, useFocusEffect } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { MainTabParamList, RootStackParamList } from "../../App";
+import type { MainTabParamList, RootStackParamList } from "../../../App";
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "../supabase";
-import { fetchHomeActivity, fetchHomeOverview, type HomeActivityItem } from "../data/eventStore";
+import { supabase } from "../../supabase";
+import { fetchHomeActivity, fetchHomeOverview, type HomeActivityItem } from "../../data/eventStore";
 
 type Props = CompositeScreenProps<
-  BottomTabScreenProps<MainTabParamList, "Start">,
+  BottomTabScreenProps<MainTabParamList, "Home">,
   NativeStackScreenProps<RootStackParamList>
 >;
 
 
 
-export default function StartScreen({ navigation }: Props) {
+export default function HomeScreen({ navigation }: Props) {
   const [displayUsername, setDisplayUsername] = useState("No username found");
   const [upcomingCount, setUpcomingCount] = useState(0);
   const [pendingInviteCount, setPendingInviteCount] = useState(0);
@@ -86,7 +86,7 @@ export default function StartScreen({ navigation }: Props) {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Overview</Text>
-          <Pressable onPress={() => navigation.navigate("Events")}>
+          <Pressable onPress={() => navigation.navigate("MyEvents")}>
             <Text style={styles.sectionAction}>View events</Text>
           </Pressable>
         </View>

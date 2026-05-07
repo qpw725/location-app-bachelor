@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, View, Text, StyleSheet, ActivityIndicator, RefreshControl } from "react-native";
-import EventAttendeeSection from "../components/EventAttendeeSection";
-import { fetchEventBuckets, type EventItem } from "../data/eventStore";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import type { RootStackParamList } from "../../../App";
+import { EventSummaryCard } from "../../components/EventListViews";
+import { fetchEventBuckets, type EventItem } from "../../data/eventStore";
 
-export default function PastEventsScreen() {
+type Props = NativeStackScreenProps<RootStackParamList, "PastEvents">;
+
+export default function PastEventsScreen({ navigation }: Props) {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -60,22 +64,11 @@ export default function PastEventsScreen() {
         </View>
       ) : null}
       {events.map((event) => (
-        <View key={event.id} style={styles.eventCard}>
-          <View style={styles.eventHeader}>
-            <Text style={styles.eventTitle}>{event.title}</Text>
-            <View style={[styles.visibilityBadge, event.visibility === "Public" ? styles.publicBadge : styles.privateBadge]}>
-              <Text style={styles.visibilityText}>{event.visibility}</Text>
-            </View>
-          </View>
-          <Text style={styles.eventDescription}>{event.description}</Text>
-          <Text style={styles.eventMeta}>{event.time}</Text>
-          <Text style={styles.eventMeta}>{event.place}</Text>
-          <View style={styles.metaFooter}>
-            <Text style={styles.metaLabel}>{event.host}</Text>
-            <Text style={styles.metaLabel}>{event.genre}</Text>
-          </View>
-          <EventAttendeeSection eventId={event.id} />
-        </View>
+        <EventSummaryCard
+          key={event.id}
+          event={event}
+          onPress={() => navigation.navigate("EventDetails", { eventId: event.id, source: "past" })}
+        />
       ))}
     </ScrollView>
   );
@@ -130,29 +123,4 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 16, fontWeight: "700", color: "#201c19", marginBottom: 4 },
   emptyText: { fontSize: 13, color: "#6f6258", lineHeight: 20 },
-  eventCard: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    padding: 16,
-    marginTop: 12,
-  },
-  eventHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
-  eventTitle: { fontSize: 16, fontWeight: "700", color: "#241f1c", marginBottom: 4, flex: 1, marginRight: 8 },
-  eventDescription: { fontSize: 13, color: "#5f5145", marginBottom: 6, lineHeight: 19 },
-  eventMeta: { fontSize: 13, color: "#6f6258" },
-  visibilityBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 1 },
-  publicBadge: { backgroundColor: "#eef3e8", borderColor: "#d3ddc8" },
-  privateBadge: { backgroundColor: "#f3eee7", borderColor: "#e2d6c6" },
-  visibilityText: { fontSize: 11, fontWeight: "700", color: "#4f4339" },
-  metaFooter: {
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: "#efe4d7",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  metaLabel: { fontSize: 12, color: "#4e6258", fontWeight: "600" },
 });
