@@ -11,16 +11,11 @@ import {
 } from "react-native";
 import { CommonActions } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { RootStackParamList } from "../../../App";
+import type { EventInvitee, RootStackParamList } from "../../../App";
 import StepIndicator from "../../components/StepIndicator";
 import { supabase } from "../../supabase";
 
 type Props = NativeStackScreenProps<RootStackParamList, "CreateEventInvite">;
-
-type InvitedFriend = {
-  id: string;
-  username: string;
-};
 
 type FriendSuggestion = {
   id: string;
@@ -50,8 +45,9 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
 
   const [visibility, setVisibility] = useState<"Private" | "Public">("Private");
   const [selectedCategory, setSelectedCategory] = useState(categoryOptions[0]);
+  const [attendanceCountingEnabled, setAttendanceCountingEnabled] = useState(false);
   const [inviteInput, setInviteInput] = useState("");
-  const [invitedPeople, setInvitedPeople] = useState<InvitedFriend[]>([]);
+  const [invitedPeople, setInvitedPeople] = useState<EventInvitee[]>([]);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
   const [addingInvitee, setAddingInvitee] = useState(false);
@@ -254,26 +250,6 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
       return;
     }
 
-    const [userA, userB] = [activeUserId, friendProfile.id].sort();
-    const { data: existingFriendship, error: friendshipError } = await supabase
-      .from("friendships")
-      .select("user_a")
-      .eq("user_a", userA)
-      .eq("user_b", userB)
-      .maybeSingle();
-
-    if (friendshipError) {
-      setInviteError(friendshipError.message);
-      setAddingInvitee(false);
-      return;
-    }
-
-    if (!existingFriendship) {
-      setInviteError("You can only invite users who are already your friends.");
-      setAddingInvitee(false);
-      return;
-    }
-
     const username = friendProfile.username.trim();
     setInvitedPeople((prev) => {
       if (prev.some((person) => person.id === friendProfile.id)) {
@@ -342,6 +318,9 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
         end_time: endDate.toISOString(),
         genre: selectedCategory,
         private: visibility === "Private",
+        attendance_enabled: false,
+        attendance_method: null,
+        attendance_radius_meters: null,
       })
       .select("id")
       .single();
@@ -384,6 +363,20 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
     );
   }
 
+  function continueWithAttendanceSetup() {
+    navigation.navigate("CreateEventAttendance", {
+      eventName,
+      eventDescription,
+      location,
+      eventTime,
+      eventEndTime,
+      eventDate,
+      visibility,
+      selectedCategory,
+      invitedPeople,
+    });
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -396,7 +389,7 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       >
-        <StepIndicator step={3} total={3} label="Finalize" />
+        <StepIndicator step={3} total={attendanceCountingEnabled ? 4 : 3} label="Finalize" />
 
         <View style={styles.heroCard}>
           <Text style={styles.title}>Review everything before you create it</Text>
@@ -442,6 +435,27 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
             ))}
           </View>
 
+          <Text style={styles.settingLabel}>Attendance counting</Text>
+          <View style={styles.toggleRow}>
+            {[
+              { label: "Off", value: false },
+              { label: "On", value: true },
+            ].map((option) => (
+              <Pressable
+                key={option.label}
+                style={[styles.optionChip, attendanceCountingEnabled === option.value && styles.optionChipActive]}
+                onPress={() => setAttendanceCountingEnabled(option.value)}
+              >
+                <Text style={[styles.optionChipText, attendanceCountingEnabled === option.value && styles.optionChipTextActive]}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          {attendanceCountingEnabled ? (
+            <Text style={styles.helperText}>A setup step will be added so you can choose GPS geofence or BLE beacon attendance.</Text>
+          ) : null}
+
         </View>
 
         <View style={styles.card}>
@@ -450,7 +464,7 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
             <TextInput
               value={inviteInput}
               onChangeText={setInviteInput}
-              placeholder="Add a friend's username"
+              placeholder="Add a username"
               placeholderTextColor="#8a7f74"
               style={styles.input}
               autoCorrect={false}
@@ -481,7 +495,7 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
           ) : null}
 
           <View style={styles.suggestionSection}>
-            <Text style={styles.suggestionTitle}>Friends you can invite</Text>
+            <Text style={styles.suggestionTitle}>Friends</Text>
             {loadingFriendSuggestions ? (
               <Text style={styles.placeholderText}>Loading friends...</Text>
             ) : availableFriendSuggestions.length === 0 ? (
@@ -518,9 +532,19 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
         {createEventError ? <Text style={styles.errorText}>{createEventError}</Text> : null}
         {createEventSuccess ? <Text style={styles.successText}>{createEventSuccess}</Text> : null}
 
-        <Pressable style={[styles.primaryBtn, creatingEvent && styles.primaryBtnDisabled]} onPress={handleCreateEvent} disabled={creatingEvent}>
+        <Pressable
+          style={[styles.primaryBtn, creatingEvent && styles.primaryBtnDisabled]}
+          onPress={attendanceCountingEnabled ? continueWithAttendanceSetup : handleCreateEvent}
+          disabled={creatingEvent}
+        >
           <Text style={styles.primaryBtnText}>
-            {creatingEvent ? "Creating..." : visibility === "Public" ? "Publish event" : "Create event"}
+            {creatingEvent
+              ? "Creating..."
+              : attendanceCountingEnabled
+                ? "Choose attendance method"
+                : visibility === "Public"
+                  ? "Publish event"
+                  : "Create event"}
           </Text>
         </Pressable>
       </ScrollView>
@@ -581,6 +605,12 @@ const styles = StyleSheet.create({
   },
   optionChipTextActive: {
     color: "#ffffff",
+  },
+  helperText: {
+    color: "#6f6258",
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 8,
   },
   inviteRow: { flexDirection: "row", gap: 8, alignItems: "center" },
   input: {

@@ -1,10 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import * as Calendar from "expo-calendar";
 import type { RootStackParamList } from "../../../App";
-import EventAttendeeSection from "../../components/EventAttendeeSection";
+import EventInviteStatusSection from "../../components/EventInviteStatusSection";
+import {
+  autoCheckInWithGpsGeofence,
+  canUseGpsAttendance,
+  fetchEventAttendanceCount,
+  isEventOngoing,
+} from "../../data/eventAttendance";
 import { deleteHostedEvent, fetchEventBuckets, leaveEvent, type EventItem } from "../../data/eventStore";
+import { supabase } from "../../supabase";
 
 type Props = NativeStackScreenProps<RootStackParamList, "EventDetails">;
 
@@ -14,6 +21,9 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processingAction, setProcessingAction] = useState(false);
+  const [attendanceCount, setAttendanceCount] = useState(0);
+  const [attendanceStatus, setAttendanceStatus] = useState<string | null>(null);
+  const autoAttendanceEventRef = useRef<string | null>(null);
 
   const loadEvent = useCallback(async () => {
     setError(null);
@@ -41,6 +51,104 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
   useEffect(() => {
     void loadEvent();
   }, [loadEvent]);
+
+  const loadAttendanceCount = useCallback(async () => {
+    const { count, error: attendanceError } = await fetchEventAttendanceCount(eventId);
+    if (attendanceError) {
+      setAttendanceStatus(attendanceError);
+      return;
+    }
+
+    setAttendanceCount(count);
+  }, [eventId]);
+
+  useEffect(() => {
+    if (!event?.attendanceEnabled) {
+      setAttendanceCount(0);
+      setAttendanceStatus(null);
+      return;
+    }
+
+    void loadAttendanceCount();
+  }, [event, loadAttendanceCount]);
+
+  useEffect(() => {
+    if (!event?.attendanceEnabled || !isEventOngoing(event)) {
+      return;
+    }
+
+    const channel = supabase
+      .channel(`event-attendance:${event.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "event_attendance",
+          filter: `event_id=eq.${event.id}`,
+        },
+        () => {
+          void loadAttendanceCount();
+        }
+      )
+      .subscribe();
+
+    const refreshHandle = setInterval(() => {
+      void loadAttendanceCount();
+    }, 15000);
+
+    return () => {
+      clearInterval(refreshHandle);
+      void supabase.removeChannel(channel);
+    };
+  }, [event, loadAttendanceCount]);
+
+  useEffect(() => {
+    if (!event || autoAttendanceEventRef.current === event.id) {
+      return;
+    }
+
+    if (!canUseGpsAttendance(event) || !isEventOngoing(event)) {
+      return;
+    }
+
+    const activeEvent = event;
+    autoAttendanceEventRef.current = activeEvent.id;
+    let isMounted = true;
+
+    async function runAutomaticAttendance() {
+      const result = await autoCheckInWithGpsGeofence(activeEvent);
+      if (!isMounted) {
+        return;
+      }
+
+      if (result.status === "checked_in") {
+        setAttendanceStatus("You are counted as present.");
+        await loadAttendanceCount();
+        return;
+      }
+
+      if (result.status === "already_checked_in") {
+        setAttendanceStatus("You are counted as present.");
+        return;
+      }
+
+      if (result.status === "outside_geofence") {
+        setAttendanceStatus(`You are ${Math.round(result.distanceMeters)} m away. Attendance radius is ${result.radiusMeters} m.`);
+        return;
+      }
+
+      if (result.status === "error") {
+        setAttendanceStatus(result.reason);
+      }
+    }
+
+    void runAutomaticAttendance();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [event, loadAttendanceCount]);
 
   function openMap() {
     if (!event) {
@@ -150,6 +258,17 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
 
       {event ? (
         <>
+          {event.attendanceEnabled && isEventOngoing(event) ? (
+            <View style={styles.liveAttendanceCard}>
+              <View style={styles.liveAttendanceHeader}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveAttendanceLabel}>Live attendance</Text>
+              </View>
+              <Text style={styles.liveAttendanceCount}>{attendanceCount} present</Text>
+              {attendanceStatus ? <Text style={styles.liveAttendanceStatus}>{attendanceStatus}</Text> : null}
+            </View>
+          ) : null}
+
           <View style={styles.hero}>
             <View style={styles.heroHeader}>
               <Text style={styles.heroTitle}>{event.title}</Text>
@@ -179,8 +298,8 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Attending people</Text>
-            <EventAttendeeSection eventId={event.id} />
+            <Text style={styles.sectionTitle}>Invited people</Text>
+            <EventInviteStatusSection eventId={event.id} />
           </View>
 
           {source === "attending" ? (
@@ -233,6 +352,44 @@ const styles = StyleSheet.create({
   heroTitle: { flex: 1, color: "#1f1a17", fontSize: 28, fontWeight: "800" },
   heroSubtitle: { color: "#67594d", fontSize: 15, lineHeight: 22 },
   heroActionRow: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 16 },
+  liveAttendanceCard: {
+    backgroundColor: "#fff4f1",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#f0c6c0",
+    padding: 16,
+    marginBottom: 12,
+  },
+  liveAttendanceHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 6,
+  },
+  liveDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#d92d20",
+  },
+  liveAttendanceLabel: {
+    color: "#a23d3d",
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  liveAttendanceCount: {
+    color: "#d92d20",
+    fontSize: 24,
+    fontWeight: "900",
+  },
+  liveAttendanceStatus: {
+    color: "#a23d3d",
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 18,
+    marginTop: 4,
+  },
   card: {
     backgroundColor: "#fffaf4",
     borderRadius: 22,

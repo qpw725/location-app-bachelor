@@ -19,53 +19,23 @@ type Props = CompositeScreenProps<
   NativeStackScreenProps<RootStackParamList>
 >;
 
-function MyEventPreviewCard({ title, description, time, place, host, genre, visibility }: EventItem) {
-  return (
-    <View style={styles.previewEventCard}>
-      <View style={styles.eventHeader}>
-        <Text style={styles.eventTitle}>{title}</Text>
-        <View style={[styles.visibilityBadge, visibility === "Public" ? styles.publicBadge : styles.privateBadge]}>
-          <Text style={styles.visibilityText}>{visibility}</Text>
-        </View>
-      </View>
-      <Text style={styles.eventDescription} numberOfLines={2}>{description}</Text>
-      <Text style={styles.eventMeta}>{time}</Text>
-      <Text style={styles.eventMeta}>{place}</Text>
-      <View style={styles.previewFooter}>
-        <Text style={styles.previewHost}>{host}</Text>
-        <Text style={styles.previewVibe}>{genre}</Text>
-      </View>
-    </View>
-  );
-}
-
 function CategoryCard({
   label,
   count,
-  preview,
   onPress,
 }: {
   label: string;
   count: number;
-  preview?: EventItem;
   onPress: () => void;
 }) {
+  const countLabel = count === 1 ? "1 event" : `${count} events`;
+
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.categoryCard, pressed && styles.pressed]}>
       <View style={styles.categoryHeader}>
-        <View>
-          <Text style={styles.categoryLabel}>{label}</Text>
-          <Text style={styles.categoryCount}>{count} events</Text>
-        </View>
+        <Text style={styles.categoryLabel}>{label}</Text>
+        <Text style={styles.categoryCount}>{countLabel}</Text>
       </View>
-
-      {preview ? (
-        <View style={styles.previewWrap}>
-          <MyEventPreviewCard {...preview} />
-        </View>
-      ) : (
-        <Text style={styles.emptyPreview}>No events yet</Text>
-      )}
     </Pressable>
   );
 }
@@ -138,19 +108,16 @@ export default function MyEventsScreen({ navigation }: Props) {
         <CategoryCard
           label="Attending"
           count={invitedEvents.length}
-          preview={invitedEvents[0]}
           onPress={() => navigation.navigate("AttendingEvents")}
         />
         <CategoryCard
           label="Hosting"
           count={hostingEvents.length}
-          preview={hostingEvents[0]}
           onPress={() => navigation.navigate("HostingEvents")}
         />
         <CategoryCard
           label="Past"
           count={pastEvents.length}
-          preview={pastEvents[0]}
           onPress={() => navigation.navigate("PastEvents")}
         />
       </View>
@@ -199,57 +166,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 12,
   },
   categoryLabel: { fontSize: 18, fontWeight: "700", color: "#201c19" },
-  categoryCount: { marginTop: 2, fontSize: 13, color: "#6f6258" },
-  previewWrap: { marginTop: 10 },
-  emptyPreview: { marginTop: 10, fontSize: 13, color: "#8a7f74" },
+  categoryCount: { fontSize: 15, color: "#2f5d50", fontWeight: "800" },
   pressed: { opacity: 0.88 },
-  previewEventCard: {
-    backgroundColor: "#fff6ea",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    padding: 12,
-  },
-  eventHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
-  eventTitle: { fontSize: 16, fontWeight: "700", color: "#241f1c", marginBottom: 4 },
-  eventMeta: { fontSize: 13, color: "#6f6258" },
-  eventDescription: { fontSize: 13, color: "#5f5145", marginBottom: 6, lineHeight: 19 },
-  visibilityBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  publicBadge: {
-    backgroundColor: "#eef3e8",
-    borderColor: "#d3ddc8",
-  },
-  privateBadge: {
-    backgroundColor: "#f3eee7",
-    borderColor: "#e2d6c6",
-  },
-  visibilityText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#4f4339",
-  },
-  previewFooter: {
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: "#efe4d7",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  previewHost: { fontSize: 12, color: "#4e6258", fontWeight: "600" },
-  previewVibe: { fontSize: 12, color: "#6f6258" },
   stateCard: {
     backgroundColor: "#fffaf4",
     borderRadius: 18,

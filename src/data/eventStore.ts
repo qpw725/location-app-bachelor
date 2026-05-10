@@ -14,6 +14,9 @@ type DbEventRow = {
   genre: string | null;
   private: boolean | null;
   creator_id: string | null;
+  attendance_enabled: boolean | null;
+  attendance_method: string | null;
+  attendance_radius_meters: number | null;
 };
 
 type ProfileRow = {
@@ -50,6 +53,9 @@ export type EventItem = {
   startAt: Date | null;
   endAt: Date | null;
   creatorId: string | null;
+  attendanceEnabled: boolean;
+  attendanceMethod: string | null;
+  attendanceRadiusMeters: number | null;
 };
 
 export type EventBuckets = {
@@ -86,6 +92,14 @@ export type EventAttendee = {
   name: string;
   avatarUrl: string | null;
   isHost: boolean;
+};
+
+export type EventInviteStatus = {
+  id: string;
+  username: string;
+  name: string;
+  avatarUrl: string | null;
+  status: "host" | "accepted" | "declined" | "pending";
 };
 
 function formatHostName(profile: ProfileRow | undefined, creatorId: string | null, activeUserId: string | null) {
@@ -131,6 +145,9 @@ function mapEventRow(row: DbEventRow, creatorProfile: ProfileRow | undefined, ac
     startAt: row.start_time ? new Date(row.start_time) : null,
     endAt: row.end_time ? new Date(row.end_time) : null,
     creatorId: row.creator_id,
+    attendanceEnabled: Boolean(row.attendance_enabled),
+    attendanceMethod: row.attendance_method?.trim() || null,
+    attendanceRadiusMeters: row.attendance_radius_meters,
   };
 }
 
@@ -154,10 +171,12 @@ export async function fetchEventBuckets(): Promise<{ data: EventBuckets | null; 
   }
 
   const userId = authData.user?.id ?? null;
+  const eventSelect =
+    "id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id, attendance_enabled, attendance_method, attendance_radius_meters";
 
   const { data: publicRows, error: publicError } = await supabase
     .from("events")
-    .select("id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id")
+    .select(eventSelect)
     .eq("private", false)
     .order("start_time", { ascending: true });
 
@@ -193,7 +212,7 @@ export async function fetchEventBuckets(): Promise<{ data: EventBuckets | null; 
   if (acceptedInviteEventIds.size > 0) {
     const { data, error } = await supabase
       .from("events")
-      .select("id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id")
+      .select(eventSelect)
       .in("id", Array.from(acceptedInviteEventIds))
       .order("start_time", { ascending: true });
 
@@ -208,7 +227,7 @@ export async function fetchEventBuckets(): Promise<{ data: EventBuckets | null; 
   if (userId) {
     const { data, error } = await supabase
       .from("events")
-      .select("id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id")
+      .select(eventSelect)
       .eq("creator_id", userId)
       .order("start_time", { ascending: true });
 
@@ -484,9 +503,11 @@ export async function fetchHomeActivity(): Promise<{ data: HomeActivityItem[] | 
 
   if (pendingEventIds.length > 0) {
     const { data: eventRows, error: eventRowsError } = await supabase
-    .from("events")
-    .select("id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id")
-    .in("id", pendingEventIds);
+      .from("events")
+      .select(
+        "id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id, attendance_enabled, attendance_method, attendance_radius_meters"
+      )
+      .in("id", pendingEventIds);
 
     if (eventRowsError) {
       return { data: null, error: eventRowsError.message };
@@ -791,6 +812,88 @@ export async function fetchEventAttendees(eventId: string): Promise<{ data: Even
   return { data: attendees, error: null };
 }
 
+export async function fetchEventInviteStatuses(eventId: string): Promise<{ data: EventInviteStatus[] | null; error: string | null }> {
+  const { data: event, error: eventError } = await supabase
+    .from("events")
+    .select("creator_id")
+    .eq("id", eventId)
+    .maybeSingle();
+
+  if (eventError) {
+    return { data: null, error: eventError.message };
+  }
+
+  if (!event?.creator_id) {
+    return { data: [], error: null };
+  }
+
+  const { data: inviteRows, error: inviteError } = await supabase
+    .from("event_invites")
+    .select("invitee_id, status")
+    .eq("event_id", eventId);
+
+  if (inviteError) {
+    return { data: null, error: inviteError.message };
+  }
+
+  const invitees = ((inviteRows ?? []) as Array<{ invitee_id: string; status: string | null }>)
+    .filter((row) => row.invitee_id !== event.creator_id);
+  const profileIds = Array.from(new Set([event.creator_id, ...invitees.map((row) => row.invitee_id)]));
+
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select("id, username, first_name, last_name, avatar_path")
+    .in("id", profileIds);
+
+  if (profilesError) {
+    return { data: null, error: profilesError.message };
+  }
+
+  const profileMap = new Map<string, ProfileRow>();
+  for (const profile of (profiles ?? []) as ProfileRow[]) {
+    profileMap.set(profile.id, profile);
+  }
+
+  const hostProfile = profileMap.get(event.creator_id);
+  const statuses: EventInviteStatus[] = hostProfile
+    ? [
+        {
+          id: hostProfile.id,
+          username: hostProfile.username?.trim() ?? "",
+          name: fullNameFromProfile(hostProfile),
+          avatarUrl: avatarUrlFromProfile(hostProfile),
+          status: "host",
+        },
+      ]
+    : [];
+
+  statuses.push(
+    ...invitees
+      .map((row): EventInviteStatus | null => {
+        const profile = profileMap.get(row.invitee_id);
+        if (!profile) {
+          return null;
+        }
+
+        const rawStatus = row.status?.trim().toLowerCase();
+        const status: EventInviteStatus["status"] =
+          rawStatus === "accepted" || rawStatus === "declined" ? rawStatus : "pending";
+
+        return {
+          id: profile.id,
+          username: profile.username?.trim() ?? "",
+          name: fullNameFromProfile(profile),
+          avatarUrl: avatarUrlFromProfile(profile),
+          status,
+        };
+      })
+      .filter((row): row is EventInviteStatus => row !== null)
+      .sort((a, b) => a.name.localeCompare(b.name))
+  );
+
+  return { data: statuses, error: null };
+}
+
 export async function addHostedEventInvite(eventId: string, usernameInput: string): Promise<{ data: HostedEventInvitee | null; error: string | null }> {
   const username = usernameInput.trim();
   if (!username) {
@@ -824,22 +927,6 @@ export async function addHostedEventInvite(eventId: string, usernameInput: strin
 
   if (friendProfile.id === userId) {
     return { data: null, error: "You cannot invite yourself." };
-  }
-
-  const [userA, userB] = [userId, friendProfile.id].sort();
-  const { data: friendship, error: friendshipError } = await supabase
-    .from("friendships")
-    .select("user_a")
-    .eq("user_a", userA)
-    .eq("user_b", userB)
-    .maybeSingle();
-
-  if (friendshipError) {
-    return { data: null, error: friendshipError.message };
-  }
-
-  if (!friendship) {
-    return { data: null, error: "You can only invite users who are already your friends." };
   }
 
   const { error: inviteInsertError } = await supabase

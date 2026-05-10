@@ -14,6 +14,7 @@ import InboxScreen from "./src/screens/tabs/InboxScreen";
 import CreateEventDetailsScreen from "./src/screens/create-event/CreateEventDetailsScreen";
 import CreateEventLocationScreen from "./src/screens/create-event/CreateEventLocationScreen";
 import CreateEventInviteScreen from "./src/screens/create-event/CreateEventInviteScreen";
+import CreateEventAttendanceScreen from "./src/screens/create-event/CreateEventAttendanceScreen";
 import ProfileScreen from "./src/screens/tabs/ProfileScreen";
 import EditProfileScreen from "./src/screens/profile/EditProfileScreen";
 import AttendingEventsScreen from "./src/screens/events/AttendingEventsScreen";
@@ -45,6 +46,13 @@ export type EventDate = {
   day: number;
 };
 
+export type EventAttendanceMethod = "gps_geofence" | "ble_beacon";
+
+export type EventInvitee = {
+  id: string;
+  username: string;
+};
+
 export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList>;
   EditProfile:
@@ -68,6 +76,17 @@ export type RootStackParamList = {
     eventTime: EventTime;
     eventEndTime: EventTime;
     eventDate: EventDate;
+  };
+  CreateEventAttendance: {
+    eventName: string;
+    eventDescription?: string;
+    location: EventLocation;
+    eventTime: EventTime;
+    eventEndTime: EventTime;
+    eventDate: EventDate;
+    visibility: "Private" | "Public";
+    selectedCategory: string;
+    invitedPeople: EventInvitee[];
   };
   LiveEventMap: {
     eventId: string;
@@ -271,6 +290,11 @@ export default function App() {
             name="CreateEventInvite"
             component={CreateEventInviteScreen}
             options={{ title: "Event", headerBackTitle: "Location" }}
+          />
+          <Stack.Screen
+            name="CreateEventAttendance"
+            component={CreateEventAttendanceScreen}
+            options={{ title: "Attendance", headerBackTitle: "Event" }}
           />
           <Stack.Screen
             name="LiveEventMap"
