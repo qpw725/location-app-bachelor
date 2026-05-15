@@ -1,4 +1,3 @@
-import { PermissionsAndroid, Platform } from "react-native";
 import BleAdvertise from "react-native-ble-advertise";
 import { BleManager, type Device } from "react-native-ble-plx";
 import type { EventItem } from "./eventStore";
@@ -6,7 +5,6 @@ import { isEventOngoing } from "./eventAttendance";
 import { supabase } from "../supabase";
 
 const APP_BEACON_UUID = "44c13e43-097a-9c9f-537f-5666a6840c08";
-const ANDROID_COMPANY_ID = 0x00e0;
 const BLE_SCAN_TIMEOUT_MS = 12000;
 
 const bleManager = new BleManager();
@@ -52,18 +50,9 @@ export async function startHostBleBeacon(event: EventItem): Promise<HostBeaconRe
     return { status: "not_available", reason: "The Bluetooth beacon can only run while the event is ongoing." };
   }
 
-  const hasPermission = await requestBleAdvertisePermissions();
-  if (!hasPermission) {
-    return { status: "not_available", reason: "Bluetooth permission is needed to start the event beacon." };
-  }
-
   const identity = getEventBeaconIdentity(event.id);
 
   try {
-    if (Platform.OS === "android") {
-      BleAdvertise.setCompanyId(ANDROID_COMPANY_ID);
-    }
-
     await BleAdvertise.broadcast(identity.uuid, identity.major, identity.minor);
     return { status: "started", major: identity.major, minor: identity.minor };
   } catch (error: unknown) {
@@ -117,11 +106,6 @@ export async function autoCheckInWithBleBeacon(event: EventItem): Promise<BleAtt
     return { status: "already_checked_in" };
   }
 
-  const hasPermission = await requestBleScanPermissions();
-  if (!hasPermission) {
-    return { status: "not_available", reason: "Bluetooth permission is needed to count attendance." };
-  }
-
   const scanResult = await scanForEventBeacon(event.id);
   if (scanResult.status !== "found") {
     return scanResult.status === "error"
@@ -146,41 +130,6 @@ export async function autoCheckInWithBleBeacon(event: EventItem): Promise<BleAtt
   }
 
   return { status: "checked_in", rssi: scanResult.rssi };
-}
-
-async function requestBleScanPermissions() {
-  if (Platform.OS !== "android") {
-    return true;
-  }
-
-  const permissions =
-    Platform.Version >= 31
-      ? [
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        ]
-      : [PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION];
-
-  const result = await PermissionsAndroid.requestMultiple(permissions);
-  return Object.values(result).every((value) => value === PermissionsAndroid.RESULTS.GRANTED);
-}
-
-async function requestBleAdvertisePermissions() {
-  if (Platform.OS !== "android") {
-    return true;
-  }
-
-  const permissions =
-    Platform.Version >= 31
-      ? [
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_ADVERTISE,
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-        ]
-      : [PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION];
-
-  const result = await PermissionsAndroid.requestMultiple(permissions);
-  return Object.values(result).every((value) => value === PermissionsAndroid.RESULTS.GRANTED);
 }
 
 function scanForEventBeacon(eventId: string): Promise<{ status: "found"; rssi: number | null } | { status: "not_found" } | { status: "error"; reason: string }> {

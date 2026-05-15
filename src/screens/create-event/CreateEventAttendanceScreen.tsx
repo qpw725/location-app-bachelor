@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { CommonActions } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import Slider from "@react-native-community/slider";
 import type { EventAttendanceMethod, RootStackParamList } from "../../../App";
 import StepIndicator from "../../components/StepIndicator";
@@ -182,14 +182,14 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 96 : 24}
+      behavior="padding"
+      keyboardVerticalOffset={96}
     >
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+        keyboardDismissMode="interactive"
       >
         <StepIndicator step={4} total={4} label="Attendance" />
 

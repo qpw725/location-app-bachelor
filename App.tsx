@@ -3,7 +3,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { NavigatorScreenParams } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { Session } from "@supabase/supabase-js";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fdfdfd",
     paddingHorizontal: 14,
     paddingTop: 10,
-    paddingBottom: Platform.OS === "ios" ? 10 : 12,
+    paddingBottom: 10,
     elevation: 10,
     shadowColor: "#0f172a",
     shadowOffset: {
