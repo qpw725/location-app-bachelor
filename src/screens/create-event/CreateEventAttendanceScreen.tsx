@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { CommonActions } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import Slider from "@react-native-community/slider";
 import type { EventAttendanceMethod, RootStackParamList } from "../../../App";
 import StepIndicator from "../../components/StepIndicator";
@@ -75,6 +75,14 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
   async function handleCreateEvent() {
     setCreateEventError(null);
     setCreateEventSuccess(null);
+
+    if (selectedMethod === "ble_beacon") {
+      const message = "Bluetooth beacon attendance is not implemented yet. Please choose GPS geofence for now.";
+      setCreateEventError(message);
+      Alert.alert("Not implemented yet", message);
+      return;
+    }
+
     setCreatingEvent(true);
 
     const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -196,7 +204,7 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
         <View style={styles.heroCard}>
           <Text style={styles.title}>Choose how attendance should be counted</Text>
           <Text style={styles.heroText}>
-            This only sets the event preference for now. The actual GPS and Bluetooth attendance checks can be wired in next.
+            GPS attendance can count people automatically. Bluetooth beacon attendance is kept as an option, but is not implemented yet.
           </Text>
         </View>
 

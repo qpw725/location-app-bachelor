@@ -5,12 +5,6 @@ import * as Calendar from "expo-calendar";
 import type { RootStackParamList } from "../../../App";
 import EventInviteStatusSection from "../../components/EventInviteStatusSection";
 import {
-  autoCheckInWithBleBeacon,
-  canUseBleAttendance,
-  startHostBleBeacon,
-  stopHostBleBeacon,
-} from "../../data/bleAttendance";
-import {
   autoCheckInWithGpsGeofence,
   canUseGpsAttendance,
   fetchEventAttendanceCount,
@@ -29,8 +23,6 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
   const [processingAction, setProcessingAction] = useState(false);
   const [attendanceCount, setAttendanceCount] = useState(0);
   const [attendanceStatus, setAttendanceStatus] = useState<string | null>(null);
-  const [beaconActive, setBeaconActive] = useState(false);
-  const [beaconBusy, setBeaconBusy] = useState(false);
   const autoAttendanceEventRef = useRef<string | null>(null);
 
   const loadEvent = useCallback(async () => {
@@ -116,7 +108,7 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
       return;
     }
 
-    if (!isEventOngoing(event) || (!canUseGpsAttendance(event) && !canUseBleAttendance(event))) {
+    if (!isEventOngoing(event) || !canUseGpsAttendance(event)) {
       return;
     }
 
@@ -125,24 +117,14 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
     let isMounted = true;
 
     async function runAutomaticAttendance() {
-      const result = canUseGpsAttendance(activeEvent)
-        ? await autoCheckInWithGpsGeofence(activeEvent)
-        : await autoCheckInWithBleBeacon(activeEvent);
+      const result = await autoCheckInWithGpsGeofence(activeEvent);
 
       if (!isMounted) {
         return;
       }
 
       if (result.status === "checked_in") {
-        if ("distanceMeters" in result) {
-          setAttendanceStatus("You are counted as present.");
-        } else {
-          setAttendanceStatus(
-            typeof result.rssi === "number"
-              ? `You are counted as present. Beacon signal: ${result.rssi} dBm.`
-              : "You are counted as present."
-          );
-        }
+        setAttendanceStatus("You are counted as present.");
         await loadAttendanceCount();
         return;
       }
@@ -154,11 +136,6 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
 
       if (result.status === "outside_geofence") {
         setAttendanceStatus(`You are ${Math.round(result.distanceMeters)} m away. Attendance radius is ${result.radiusMeters} m.`);
-        return;
-      }
-
-      if (result.status === "beacon_not_found") {
-        setAttendanceStatus("Bluetooth beacon not found nearby. Stay close to the host phone and try reopening the event.");
         return;
       }
 
@@ -174,55 +151,12 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
     };
   }, [event, loadAttendanceCount, source]);
 
-  useEffect(() => {
-    return () => {
-      if (beaconActive) {
-        void stopHostBleBeacon();
-      }
-    };
-  }, [beaconActive]);
-
   function openMap() {
     if (!event) {
       return;
     }
 
     navigation.navigate("LiveEventMap", { eventId: event.id, eventTitle: event.title });
-  }
-
-  async function handleStartBeacon() {
-    if (!event) {
-      return;
-    }
-
-    setBeaconBusy(true);
-    setAttendanceStatus(null);
-
-    const result = await startHostBleBeacon(event);
-    setBeaconBusy(false);
-
-    if (result.status === "started") {
-      setBeaconActive(true);
-      setAttendanceStatus(`Beacon active. Code ${result.major}-${result.minor}. Keep this screen open.`);
-      return;
-    }
-
-    setAttendanceStatus("reason" in result ? result.reason : "Could not start the Bluetooth beacon.");
-  }
-
-  async function handleStopBeacon() {
-    setBeaconBusy(true);
-
-    const result = await stopHostBleBeacon();
-    setBeaconBusy(false);
-
-    if (result.status === "stopped") {
-      setBeaconActive(false);
-      setAttendanceStatus("Beacon stopped.");
-      return;
-    }
-
-    setAttendanceStatus("reason" in result ? result.reason : "Could not stop the Bluetooth beacon.");
   }
 
   async function addToCalendar() {
@@ -333,19 +267,6 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
               </View>
               <Text style={styles.liveAttendanceCount}>{attendanceCount} present</Text>
               {attendanceStatus ? <Text style={styles.liveAttendanceStatus}>{attendanceStatus}</Text> : null}
-              {source === "hosting" && event.attendanceMethod === "ble_beacon" ? (
-                <View style={styles.beaconActionRow}>
-                  <Pressable
-                    style={[styles.beaconButton, beaconActive && styles.beaconButtonActive, beaconBusy && styles.beaconButtonDisabled]}
-                    onPress={beaconActive ? () => void handleStopBeacon() : () => void handleStartBeacon()}
-                    disabled={beaconBusy}
-                  >
-                    <Text style={[styles.beaconButtonText, beaconActive && styles.beaconButtonTextActive]}>
-                      {beaconBusy ? "Working..." : beaconActive ? "Stop beacon" : "Start beacon"}
-                    </Text>
-                  </Pressable>
-                </View>
-              ) : null}
             </View>
           ) : null}
 
@@ -469,32 +390,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     lineHeight: 18,
     marginTop: 4,
-  },
-  beaconActionRow: {
-    flexDirection: "row",
-    marginTop: 12,
-  },
-  beaconButton: {
-    backgroundColor: "#d92d20",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  beaconButtonActive: {
-    backgroundColor: "#fff1f1",
-    borderColor: "#efc7c7",
-    borderWidth: 1,
-  },
-  beaconButtonDisabled: {
-    opacity: 0.7,
-  },
-  beaconButtonText: {
-    color: "#ffffff",
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  beaconButtonTextActive: {
-    color: "#a23d3d",
   },
   card: {
     backgroundColor: "#fffaf4",

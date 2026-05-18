@@ -15,12 +15,9 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSBluetoothAlwaysUsageDescription": "Allow this app to use Bluetooth so hosts can broadcast event beacons and attendees can check in nearby.",
-        "UIBackgroundModes": [
-          "bluetooth-central",
-          "bluetooth-peripheral"
-        ]
-      }
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.noe.sorensen.BachelorProj"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -40,24 +37,12 @@
           "locationAlwaysAndWhenInUsePermission": "Allow this app to access your location in the background so live event sharing stays active until you stop it or the event ends.",
           "isIosBackgroundLocationEnabled": true
         }
-      ],
-      [
-        "react-native-ble-plx",
-        {
-          "isBackgroundEnabled": true,
-          "modes": [
-            "central",
-            "peripheral"
-          ],
-          "bluetoothAlwaysPermission": "Allow this app to use Bluetooth so hosts can broadcast event beacons and attendees can check in nearby."
-        }
       ]
     ],
     "extra": {
       "eas": {
-        "projectId": "eb9859f5-a4ac-4406-9011-845872bf4c92"
+        "projectId": "bcf7f63c-f226-4787-8255-e4a70018f1f4"
       }
-    },
-    "owner": "legind2000"
+    }
   }
 }
