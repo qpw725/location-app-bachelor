@@ -9,6 +9,8 @@ type EventSummaryCardProps = {
 };
 
 export function EventSummaryCard({ event, runtimeStatus, onPress }: EventSummaryCardProps) {
+  const personalPresence = getPersonalPresenceLabel(runtimeStatus);
+
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.summaryCard, pressed && styles.pressed]}>
       <View style={styles.summaryHeader}>
@@ -24,16 +26,27 @@ export function EventSummaryCard({ event, runtimeStatus, onPress }: EventSummary
       <View style={styles.summaryDivider} />
 
       {event.attendanceEnabled ? (
-        <View style={styles.statusRow}>
-          <View style={[styles.statusBadge, getRuntimeStatusBadgeStyle(runtimeStatus?.severity)]}>
-            <Text style={[styles.statusText, getRuntimeStatusTextStyle(runtimeStatus?.severity)]}>
-              {getRuntimeStatusLabel(runtimeStatus)}
-            </Text>
+        <View style={styles.statusBlock}>
+          <View style={styles.statusRow}>
+            <View style={[styles.statusBadge, getRuntimeStatusBadgeStyle(runtimeStatus?.severity)]}>
+              <Text style={[styles.statusText, getRuntimeStatusTextStyle(runtimeStatus?.severity)]}>
+                {getRuntimeStatusLabel(runtimeStatus)}
+              </Text>
+            </View>
+            {runtimeStatus?.canShowLiveState ? (
+              <Text style={styles.statusMeta} numberOfLines={1}>
+                {runtimeStatus.presentCount} present
+              </Text>
+            ) : null}
           </View>
-          {runtimeStatus?.canShowLiveState ? (
-            <Text style={styles.statusMeta} numberOfLines={1}>
-              {runtimeStatus.presentCount} present
-            </Text>
+
+          {personalPresence ? (
+            <View style={[styles.personalStatusRow, getPersonalPresenceStyle(personalPresence.tone)]}>
+              <View style={[styles.personalStatusDot, getPersonalPresenceDotStyle(personalPresence.tone)]} />
+              <Text style={[styles.personalStatusText, getPersonalPresenceTextStyle(personalPresence.tone)]} numberOfLines={1}>
+                {personalPresence.label}
+              </Text>
+            </View>
           ) : null}
         </View>
       ) : null}
@@ -78,6 +91,38 @@ function getRuntimeStatusTextStyle(severity: EventRuntimeSeverity | undefined) {
   return styles.statusTextNeutral;
 }
 
+function getPersonalPresenceLabel(status: EventRuntimeStatus | null | undefined) {
+  if (!status?.canShowLiveState || !status.viewerPresence || status.viewerPresence.isHost) {
+    return null;
+  }
+
+  if (status.viewerPresence.presenceState === "present") {
+    return { label: "You are present", tone: "success" as const };
+  }
+
+  if (status.viewerPresence.presenceState === "not_arrived") {
+    return { label: "You are not present yet", tone: "warning" as const };
+  }
+
+  if (status.viewerPresence.presenceState === "left") {
+    return { label: "You left the event area", tone: "warning" as const };
+  }
+
+  return { label: "Your location is inactive", tone: "warning" as const };
+}
+
+function getPersonalPresenceStyle(tone: "success" | "warning") {
+  return tone === "success" ? styles.personalStatusSuccess : styles.personalStatusWarning;
+}
+
+function getPersonalPresenceDotStyle(tone: "success" | "warning") {
+  return tone === "success" ? styles.personalStatusDotSuccess : styles.personalStatusDotWarning;
+}
+
+function getPersonalPresenceTextStyle(tone: "success" | "warning") {
+  return tone === "success" ? styles.personalStatusTextSuccess : styles.personalStatusTextWarning;
+}
+
 const styles = StyleSheet.create({
   summaryCard: {
     minHeight: 178,
@@ -113,12 +158,15 @@ const styles = StyleSheet.create({
     opacity: 0.18,
     marginTop: 18,
   },
+  statusBlock: {
+    gap: 8,
+    marginTop: 10,
+  },
   statusRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
-    marginTop: 10,
   },
   statusBadge: {
     borderRadius: 999,
@@ -159,6 +207,45 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     textAlign: "right",
+  },
+  personalStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+  },
+  personalStatusSuccess: {
+    backgroundColor: "#edf4ee",
+    borderColor: "#cfe0d2",
+  },
+  personalStatusWarning: {
+    backgroundColor: "#fff6ea",
+    borderColor: "#ead1a3",
+  },
+  personalStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  personalStatusDotSuccess: {
+    backgroundColor: "#2f5d50",
+  },
+  personalStatusDotWarning: {
+    backgroundColor: "#c97a15",
+  },
+  personalStatusText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  personalStatusTextSuccess: {
+    color: "#2f5d50",
+  },
+  personalStatusTextWarning: {
+    color: "#8a5a12",
   },
   summaryFooter: {
     flexDirection: "row",

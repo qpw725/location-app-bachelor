@@ -332,6 +332,16 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
             <InfoRow label="Genre" value={event.genre} />
           </View>
 
+          {source === "hosting" && event.attendanceEnabled && runtimeStatus?.canShowLiveState ? (
+            <View style={styles.card}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitleNoMargin}>Attendance</Text>
+                <Text style={styles.sectionCount}>{runtimeStatus.presentCount}/{runtimeStatus.acceptedCount} present</Text>
+              </View>
+              <AttendanceOverview status={runtimeStatus} eventStartAt={event.startAt} eventEndAt={event.endAt} />
+            </View>
+          ) : null}
+
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Invited people</Text>
             <EventInviteStatusSection eventId={event.id} />
@@ -469,6 +479,151 @@ function PresenceExceptionRow({
       </View>
     </View>
   );
+}
+
+function AttendanceOverview({
+  status,
+  eventStartAt,
+  eventEndAt,
+}: {
+  status: EventRuntimeStatus;
+  eventStartAt: Date | null;
+  eventEndAt: Date | null;
+}) {
+  const arrivedCount = status.participants.filter((participant) => participant.hasCheckedIn).length;
+  const leftCount = status.participants.filter((participant) => participant.presenceState === "left" || participant.presenceState === "stale").length;
+  const notArrivedCount = status.participants.filter((participant) => participant.presenceState === "not_arrived").length;
+
+  if (status.participants.length === 0) {
+    return <Text style={styles.emptyText}>No accepted participants yet.</Text>;
+  }
+
+  return (
+    <View>
+      <View style={styles.attendanceMetricGrid}>
+        <AttendanceMetric label="Present now" value={String(status.presentCount)} />
+        <AttendanceMetric label="Arrived" value={String(arrivedCount)} />
+        <AttendanceMetric label="Not arrived" value={String(notArrivedCount)} />
+        <AttendanceMetric label="Left/inactive" value={String(leftCount)} />
+      </View>
+
+      <View style={styles.attendanceList}>
+        {status.participants.map((participant) => (
+          <AttendanceParticipantRow key={participant.id} participant={participant} eventStartAt={eventStartAt} eventEndAt={eventEndAt} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function AttendanceMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.attendanceMetric}>
+      <Text style={styles.attendanceMetricValue}>{value}</Text>
+      <Text style={styles.attendanceMetricLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function AttendanceParticipantRow({
+  participant,
+  eventStartAt,
+  eventEndAt,
+}: {
+  participant: EventPresencePerson;
+  eventStartAt: Date | null;
+  eventEndAt: Date | null;
+}) {
+  const model = getAttendanceStatusModel(participant);
+  const timingLines = getAttendanceTimingLines(participant, eventStartAt, eventEndAt);
+
+  return (
+    <View style={styles.attendanceRow}>
+      <ProfileAvatar
+        avatarUrl={participant.avatarUrl}
+        initials={getProfileInitials(participant.name, participant.username)}
+        size={42}
+      />
+      <View style={styles.attendanceTextWrap}>
+        <View style={styles.attendanceNameRow}>
+          <Text style={styles.attendanceName} numberOfLines={1}>{participant.name}</Text>
+          <View style={[styles.attendanceStatusBadge, model.tone === "success" && styles.attendanceStatusSuccess, model.tone === "danger" && styles.attendanceStatusDanger]}>
+            <Text style={[styles.attendanceStatusText, model.tone === "success" && styles.attendanceStatusTextSuccess, model.tone === "danger" && styles.attendanceStatusTextDanger]}>
+              {model.label}
+            </Text>
+          </View>
+        </View>
+        {participant.username ? <Text style={styles.attendanceUsername}>@{participant.username}</Text> : null}
+        {timingLines.map((line) => (
+          <Text key={line} style={styles.attendanceTiming}>{line}</Text>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function getAttendanceStatusModel(participant: EventPresencePerson) {
+  if (participant.presenceState === "present") {
+    return { label: "Present", tone: "success" as const };
+  }
+
+  if (participant.presenceState === "left") {
+    return { label: "Left", tone: "warning" as const };
+  }
+
+  if (participant.presenceState === "stale") {
+    return { label: "Inactive", tone: "warning" as const };
+  }
+
+  return { label: "Missing", tone: "danger" as const };
+}
+
+function getAttendanceTimingLines(participant: EventPresencePerson, eventStartAt: Date | null, eventEndAt: Date | null) {
+  const lines: string[] = [];
+
+  if (participant.checkedInAt) {
+    const arrivedAt = new Date(participant.checkedInAt);
+    const lateMinutes = getLateMinutes(arrivedAt, eventStartAt);
+    lines.push(`Arrived ${formatShortTime(arrivedAt)}${lateMinutes > 0 ? ` - ${lateMinutes} min late` : ""}`);
+  } else {
+    lines.push("No arrival recorded");
+  }
+
+  if (participant.presenceState === "left" && participant.lastLocationAt) {
+    const leftAt = new Date(participant.lastLocationAt);
+    lines.push(`Left area ${formatShortTime(leftAt)}${isBeforeEventEnd(leftAt, eventEndAt) ? " - before end" : ""}`);
+  }
+
+  if (participant.presenceState === "stale" && participant.lastLocationAt) {
+    lines.push(`Location inactive since ${formatShortTime(new Date(participant.lastLocationAt))}`);
+  }
+
+  if (participant.presenceState === "present" && participant.distanceMeters !== null) {
+    lines.push(`${Math.round(participant.distanceMeters)} m from event location`);
+  }
+
+  return lines;
+}
+
+function getLateMinutes(arrivedAt: Date, eventStartAt: Date | null) {
+  if (!eventStartAt) {
+    return 0;
+  }
+
+  const diffMs = arrivedAt.getTime() - eventStartAt.getTime();
+  if (diffMs <= 60 * 1000) {
+    return 0;
+  }
+
+  return Math.round(diffMs / 60000);
+}
+
+function isBeforeEventEnd(leftAt: Date, eventEndAt: Date | null) {
+  return Boolean(eventEndAt && leftAt.getTime() < eventEndAt.getTime());
+}
+
+function formatShortTime(date: Date) {
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function getPersonalPresenceModel(presence: EventPresencePerson | null) {
@@ -642,6 +797,102 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: { fontSize: 18, fontWeight: "800", color: "#201c19", marginBottom: 10 },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+  },
+  sectionTitleNoMargin: { fontSize: 18, fontWeight: "800", color: "#201c19" },
+  sectionCount: { color: "#2f5d50", fontSize: 13, fontWeight: "900" },
+  attendanceMetricGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  attendanceMetric: {
+    minWidth: "47%",
+    flexGrow: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#eadfce",
+    backgroundColor: "#fff6ea",
+    padding: 12,
+  },
+  attendanceMetricValue: {
+    color: "#201c19",
+    fontSize: 22,
+    fontWeight: "900",
+  },
+  attendanceMetricLabel: {
+    color: "#6f6258",
+    fontSize: 11,
+    fontWeight: "800",
+    marginTop: 2,
+    textTransform: "uppercase",
+  },
+  attendanceList: {
+    borderTopWidth: 1,
+    borderTopColor: "#efe4d7",
+  },
+  attendanceRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#efe4d7",
+  },
+  attendanceTextWrap: {
+    flex: 1,
+  },
+  attendanceNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  attendanceName: {
+    flex: 1,
+    color: "#201c19",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  attendanceUsername: {
+    color: "#6f6258",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  attendanceStatusBadge: {
+    borderRadius: 999,
+    backgroundColor: "#fff6ea",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  attendanceStatusSuccess: {
+    backgroundColor: "#edf4ee",
+  },
+  attendanceStatusDanger: {
+    backgroundColor: "#fff1f1",
+  },
+  attendanceStatusText: {
+    color: "#8a5a12",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  attendanceStatusTextSuccess: {
+    color: "#2f5d50",
+  },
+  attendanceStatusTextDanger: {
+    color: "#a23d3d",
+  },
+  attendanceTiming: {
+    color: "#8a7f74",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 3,
+  },
   personalPresenceCard: {
     borderRadius: 18,
     borderWidth: 1,

@@ -80,12 +80,14 @@ export type EventRuntimeStatus = {
   canShowLiveState: boolean;
   presentCount: number;
   acceptedCount: number;
+  participants: EventPresencePerson[];
   missingParticipants: EventPresencePerson[];
   leftParticipants: EventPresencePerson[];
   viewerPresence: EventPresencePerson | null;
   hostPresent: boolean;
   minimumPresentCount: number | null;
   capacityLimit: number | null;
+  endedByHostLeaving?: boolean;
 };
 
 const STATUS_LEAD_MINUTES = 60;
@@ -163,6 +165,30 @@ export async function fetchEventCapacityLimit(eventId: string): Promise<number |
   }
 
   return readNumber(data.config, ["presentCount", "count", "capacity"]);
+}
+
+export async function endHostedEventNow(eventId: string): Promise<{ error: string | null }> {
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError) {
+    return { error: authError.message };
+  }
+
+  if (!user) {
+    return { error: "Could not identify current user." };
+  }
+
+  const nowIso = new Date().toISOString();
+  const { error } = await supabase
+    .from("events")
+    .update({ end_time: nowIso })
+    .eq("id", eventId)
+    .eq("creator_id", user.id);
+
+  return { error: error?.message ?? null };
 }
 
 async function fetchEventTriggers(eventId: string): Promise<{ data: EventTriggerRow[]; error: string | null }> {
@@ -307,25 +333,35 @@ function deriveRuntimeStatus(input: {
   const isHostViewer = viewerRole === "hosting";
   const canShowLiveState = isHostViewer || !Number.isFinite(statusOpenMs) || now >= statusOpenMs;
 
-  const presentCount = people.filter((person) => person.isPresent).length;
   const acceptedParticipants = people.filter((person) => !person.isHost);
+  const presentCount = acceptedParticipants.filter((person) => person.isPresent).length;
   const acceptedCount = acceptedParticipants.length;
   const host = people.find((person) => person.isHost);
   const viewerPresence = viewerId ? people.find((person) => person.id === viewerId) ?? null : null;
   const hostPresent = Boolean(host?.isPresent);
-  const hostRequired = hasTrigger(triggers, "host_enters_area");
+  const hostRule = getHostPresenceRule(triggers);
+  const hostRequired = hostRule.requireHostPresence;
+  const hostLeavesEndsEvent = hostRule.endWhenHostLeaves;
+  const hostHasLeftAfterArriving = Boolean(host?.hasCheckedIn && !hostPresent);
+  const canEndFromHostLeaving = !Number.isFinite(startMs) || now >= startMs;
+  const missingTriggerEnabled = hasTrigger(triggers, "missing_after_start");
   const minimumPresentCount = getMinimumPresentCount(triggers);
   const capacityLimit = getCapacityLimit(triggers);
-  const missingAfterMinutes = getMissingAfterMinutes(triggers);
+  const missingAfterMinutes = missingTriggerEnabled ? getMissingAfterMinutes(triggers) : null;
   const missingVisible =
-    !Number.isFinite(startMs) || now >= startMs + missingAfterMinutes * 60 * 1000 || (Number.isFinite(endMs) && now > endMs);
+    missingTriggerEnabled &&
+    (!Number.isFinite(startMs) ||
+      now >= startMs + (missingAfterMinutes ?? DEFAULT_MISSING_AFTER_MINUTES) * 60 * 1000 ||
+      (Number.isFinite(endMs) && now > endMs));
   const missingParticipants = missingVisible
     ? acceptedParticipants.filter((person) => person.presenceState === "not_arrived")
     : [];
   const leftParticipants = acceptedParticipants.filter((person) => person.presenceState === "left" || person.presenceState === "stale");
+  const createRuntimeStatus = (status: Omit<EventRuntimeStatus, "participants">) =>
+    createStatus(status, acceptedParticipants);
 
   if (!canShowLiveState) {
-    return createStatus({
+    return createRuntimeStatus({
       status: "hidden",
       severity: "neutral",
       title: "Status updates not open yet",
@@ -343,7 +379,7 @@ function deriveRuntimeStatus(input: {
   }
 
   if (Number.isFinite(endMs) && now > endMs) {
-    return createStatus({
+    return createRuntimeStatus({
       status: "ended",
       severity: "neutral",
       title: "Event ended",
@@ -360,8 +396,27 @@ function deriveRuntimeStatus(input: {
     });
   }
 
+  if (hostLeavesEndsEvent && hostHasLeftAfterArriving && canEndFromHostLeaving) {
+    return createRuntimeStatus({
+      status: "ended",
+      severity: "warning",
+      title: "Event ended",
+      message: "The host left the event area, so the event has stopped.",
+      canShowLiveState,
+      presentCount,
+      acceptedCount,
+      missingParticipants,
+      leftParticipants,
+      viewerPresence,
+      hostPresent,
+      minimumPresentCount,
+      capacityLimit,
+      endedByHostLeaving: true,
+    });
+  }
+
   if (capacityLimit && presentCount >= capacityLimit) {
-    return createStatus({
+    return createRuntimeStatus({
       status: "event_full",
       severity: "danger",
       title: "Event full",
@@ -380,7 +435,7 @@ function deriveRuntimeStatus(input: {
 
   if (hostRequired && !hostPresent) {
     if (host?.hasCheckedIn) {
-      return createStatus({
+      return createRuntimeStatus({
         status: "host_left",
         severity: "warning",
         title: "Host left event area",
@@ -397,7 +452,7 @@ function deriveRuntimeStatus(input: {
       });
     }
 
-    return createStatus({
+    return createRuntimeStatus({
       status: "host_not_arrived",
       severity: "warning",
       title: "Host not arrived",
@@ -415,7 +470,7 @@ function deriveRuntimeStatus(input: {
   }
 
   if (minimumPresentCount && presentCount < minimumPresentCount) {
-    return createStatus({
+    return createRuntimeStatus({
       status: "not_enough_participants",
       severity: "warning",
       title: "Not enough participants",
@@ -433,7 +488,7 @@ function deriveRuntimeStatus(input: {
   }
 
   if (Number.isFinite(startMs) && now < startMs) {
-    return createStatus({
+    return createRuntimeStatus({
       status: "not_started",
       severity: "neutral",
       title: "Not started yet",
@@ -451,7 +506,7 @@ function deriveRuntimeStatus(input: {
   }
 
   if (minimumPresentCount && presentCount >= minimumPresentCount) {
-    return createStatus({
+    return createRuntimeStatus({
       status: "ready",
       severity: "success",
       title: "Event ready",
@@ -468,7 +523,7 @@ function deriveRuntimeStatus(input: {
     });
   }
 
-  return createStatus({
+  return createRuntimeStatus({
     status: "active",
     severity: "success",
     title: "Event active",
@@ -485,14 +540,13 @@ function deriveRuntimeStatus(input: {
   });
 }
 
-function createStatus(status: EventRuntimeStatus): EventRuntimeStatus {
-  return status;
+function createStatus(status: Omit<EventRuntimeStatus, "participants">, participants: EventPresencePerson[]): EventRuntimeStatus {
+  return { ...status, participants };
 }
 
 function getDefaultTriggers(): EventTriggerRow[] {
   return [
-    { type: "participant_enters_area", enabled: true, config: {} },
-    { type: "host_enters_area", enabled: true, config: {} },
+    { type: "host_enters_area", enabled: true, config: { requireHostPresence: true, endWhenHostLeaves: false } },
     { type: "missing_after_start", enabled: true, config: { minutesAfterStart: DEFAULT_MISSING_AFTER_MINUTES } },
   ];
 }
@@ -504,6 +558,18 @@ function hasTrigger(triggers: EventTriggerRow[], type: EventTriggerType) {
 function getMinimumPresentCount(triggers: EventTriggerRow[]) {
   const trigger = triggers.find((row) => row.type === "minimum_present" && row.enabled !== false);
   return trigger?.config ? readNumber(trigger.config, ["count", "minimum", "minimumPresentCount"]) : null;
+}
+
+function getHostPresenceRule(triggers: EventTriggerRow[]) {
+  const trigger = triggers.find((row) => row.type === "host_enters_area" && row.enabled !== false);
+  if (!trigger) {
+    return { requireHostPresence: false, endWhenHostLeaves: false };
+  }
+
+  return {
+    requireHostPresence: readBoolean(trigger.config, "requireHostPresence", true),
+    endWhenHostLeaves: readBoolean(trigger.config, "endWhenHostLeaves", false),
+  };
 }
 
 function getCapacityLimit(triggers: EventTriggerRow[]) {
@@ -525,6 +591,14 @@ function readNumber(config: Record<string, unknown>, keys: string[]) {
   }
 
   return null;
+}
+
+function readBoolean(config: Record<string, unknown> | null, key: string, fallback: boolean) {
+  if (!config || typeof config[key] !== "boolean") {
+    return fallback;
+  }
+
+  return config[key];
 }
 
 function getPresenceState(input: {

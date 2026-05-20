@@ -25,8 +25,8 @@ const presenceOptions: Array<{
 ];
 
 type BehaviorRuleId =
-  | "participant_enters_area"
   | "host_enters_area"
+  | "host_leaves_area"
   | "minimum_present"
   | "missing_after_start"
   | "capacity_warning";
@@ -37,14 +37,14 @@ const behaviorRules: Array<{
   description: string;
 }> = [
   {
-    id: "participant_enters_area",
-    title: "Participant enters area",
-    description: "Participants can be marked present when they are inside the event area.",
-  },
-  {
     id: "host_enters_area",
     title: "Host enters area",
     description: "The event can become active when the host is physically present.",
+  },
+  {
+    id: "host_leaves_area",
+    title: "Host leaves area",
+    description: "The event stops when the host leaves the event area after it has started.",
   },
   {
     id: "minimum_present",
@@ -87,8 +87,8 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
   const [attendanceRadiusMeters, setAttendanceRadiusMeters] = useState(75);
   const [attendanceRadiusInput, setAttendanceRadiusInput] = useState("75");
   const [enabledRules, setEnabledRules] = useState<Record<BehaviorRuleId, boolean>>({
-    participant_enters_area: true,
     host_enters_area: true,
+    host_leaves_area: true,
     minimum_present: false,
     missing_after_start: true,
     capacity_warning: false,
@@ -113,12 +113,12 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
   const selectedRuleSummaries = useMemo(() => {
     const summaries: string[] = [];
 
-    if (enabledRules.participant_enters_area) {
-      summaries.push(`Mark participants present inside ${attendanceRadiusMeters} m`);
-    }
-
     if (enabledRules.host_enters_area) {
       summaries.push("Event can become active when the host is present");
+    }
+
+    if (enabledRules.host_leaves_area) {
+      summaries.push("Event stops when the host leaves after start");
     }
 
     if (enabledRules.minimum_present) {
@@ -159,23 +159,32 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
   }
 
   function buildTriggerRows(): EventTriggerInput[] {
-    return behaviorRules
-      .filter((rule) => enabledRules[rule.id])
-      .map((rule) => {
-        if (rule.id === "minimum_present") {
-          return { type: rule.id, config: { count: Number(minimumPresentCount) || 0 } };
-        }
+    const triggers: EventTriggerInput[] = [];
 
-        if (rule.id === "missing_after_start") {
-          return { type: rule.id, config: { minutesAfterStart: Number(missingAfterMinutes) || 0 } };
-        }
-
-        if (rule.id === "capacity_warning") {
-          return { type: rule.id, config: { presentCount: Number(capacityWarningCount) || 0 } };
-        }
-
-        return { type: rule.id, config: { radiusMeters: attendanceRadiusMeters } };
+    if (enabledRules.host_enters_area || enabledRules.host_leaves_area) {
+      triggers.push({
+        type: "host_enters_area",
+        config: {
+          radiusMeters: attendanceRadiusMeters,
+          requireHostPresence: enabledRules.host_enters_area,
+          endWhenHostLeaves: enabledRules.host_leaves_area,
+        },
       });
+    }
+
+    if (enabledRules.minimum_present) {
+      triggers.push({ type: "minimum_present", config: { count: Number(minimumPresentCount) || 0 } });
+    }
+
+    if (enabledRules.missing_after_start) {
+      triggers.push({ type: "missing_after_start", config: { minutesAfterStart: Number(missingAfterMinutes) || 0 } });
+    }
+
+    if (enabledRules.capacity_warning) {
+      triggers.push({ type: "capacity_warning", config: { presentCount: Number(capacityWarningCount) || 0 } });
+    }
+
+    return triggers;
   }
 
   async function handleCreateEvent() {
@@ -490,6 +499,10 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Behavior summary</Text>
           <Text style={styles.cardText}>{selectedPresenceOption.title}</Text>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryDot} />
+            <Text style={styles.summaryText}>People are marked present inside {attendanceRadiusMeters} m</Text>
+          </View>
           {selectedRuleSummaries.map((summary) => (
             <View key={summary} style={styles.summaryRow}>
               <View style={styles.summaryDot} />

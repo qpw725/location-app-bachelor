@@ -1,10 +1,11 @@
-import { AppState, type AppStateStatus, type NativeEventSubscription } from "react-native";
+import { Alert, AppState, type AppStateStatus, type NativeEventSubscription } from "react-native";
 import * as Location from "expo-location";
 import {
   canUseGpsAttendance,
   isEventPresenceWindowOpen,
   updateGpsPresenceFromCoordinates,
 } from "./data/eventAttendance";
+import { endHostedEventNow, fetchEventRuntimeStatus } from "./data/eventRules";
 import { fetchEventBuckets, type EventItem } from "./data/eventStore";
 import { supabase } from "./supabase";
 
@@ -20,6 +21,15 @@ let appStateSubscription: NativeEventSubscription | null = null;
 let startPromise: Promise<void> | null = null;
 let isStarted = false;
 let hasRequestedLocationPermission = false;
+const missingReminderEventIds = new Set<string>();
+const capacityWarningEventIds = new Set<string>();
+const endedByHostLeaveEventIds = new Set<string>();
+
+type PresenceEventSnapshot = {
+  activePresenceEvents: EventItem[];
+  attendingEvents: EventItem[];
+  hostingEvents: EventItem[];
+};
 
 function dedupeEvents(events: EventItem[]) {
   const byId = new Map<string, EventItem>();
@@ -34,7 +44,7 @@ function getEligiblePresenceEvents(events: EventItem[]) {
   return dedupeEvents(events).filter((event) => canUseGpsAttendance(event) && isEventPresenceWindowOpen(event));
 }
 
-async function fetchEligiblePresenceEvents() {
+async function fetchEligiblePresenceEvents(): Promise<PresenceEventSnapshot | null> {
   const {
     data: { user },
     error: authError,
@@ -56,7 +66,11 @@ async function fetchEligiblePresenceEvents() {
   }
 
   activeUserId = user.id;
-  return getEligiblePresenceEvents([...data.attendingEvents, ...data.hostingEvents]);
+  return {
+    activePresenceEvents: getEligiblePresenceEvents([...data.attendingEvents, ...data.hostingEvents]),
+    attendingEvents: data.attendingEvents,
+    hostingEvents: data.hostingEvents,
+  };
 }
 
 async function updatePresenceForPosition(latitude: number, longitude: number) {
@@ -70,6 +84,86 @@ async function updatePresenceForPosition(latitude: number, longitude: number) {
     if (result.status === "error") {
       console.warn(`[EventPresence] Failed to update ${event.id}:`, result.reason);
     }
+
+    if (event.creatorId === activeUserId) {
+      await maybeEndEventAfterHostLeft(event);
+    }
+  }
+}
+
+async function maybeEndEventAfterHostLeft(event: EventItem) {
+  if (!activeUserId || event.creatorId !== activeUserId || endedByHostLeaveEventIds.has(event.id)) {
+    return;
+  }
+
+  const { data: status, error } = await fetchEventRuntimeStatus({ event, viewerRole: "hosting" });
+  if (error) {
+    console.warn(`[EventPresence] Could not evaluate host-leave end for ${event.id}:`, error);
+    return;
+  }
+
+  if (status?.status !== "ended" || !status.endedByHostLeaving) {
+    return;
+  }
+
+  const { error: endError } = await endHostedEventNow(event.id);
+  if (endError) {
+    console.warn(`[EventPresence] Could not end ${event.id} after host left:`, endError);
+    return;
+  }
+
+  endedByHostLeaveEventIds.add(event.id);
+}
+
+async function maybeNotifyMissingParticipants(events: EventItem[]) {
+  if (!activeUserId) {
+    return;
+  }
+
+  const eligibleEvents = getEligiblePresenceEvents(events);
+  for (const event of eligibleEvents) {
+    if (missingReminderEventIds.has(event.id)) {
+      continue;
+    }
+
+    const { data: status, error } = await fetchEventRuntimeStatus({ event, viewerRole: "attending" });
+    if (error) {
+      console.warn(`[EventPresence] Could not evaluate missing reminder for ${event.id}:`, error);
+      continue;
+    }
+
+    const viewerIsMissing = status?.missingParticipants.some((participant) => participant.id === activeUserId) === true;
+    if (!viewerIsMissing) {
+      continue;
+    }
+
+    missingReminderEventIds.add(event.id);
+    Alert.alert(
+      "Event started",
+      `"${event.title}" has started, and you are not marked present yet. Keep the app open near the event area so your presence can update.`
+    );
+  }
+}
+
+async function maybeNotifyCapacityWarnings(events: EventItem[]) {
+  const eligibleEvents = getEligiblePresenceEvents(events);
+  for (const event of eligibleEvents) {
+    if (capacityWarningEventIds.has(event.id)) {
+      continue;
+    }
+
+    const { data: status, error } = await fetchEventRuntimeStatus({ event, viewerRole: "hosting" });
+    if (error) {
+      console.warn(`[EventPresence] Could not evaluate capacity warning for ${event.id}:`, error);
+      continue;
+    }
+
+    if (status?.status !== "event_full") {
+      continue;
+    }
+
+    capacityWarningEventIds.add(event.id);
+    Alert.alert("Capacity reached", `"${event.title}" has reached the configured present-participant limit.`);
   }
 }
 
@@ -83,7 +177,7 @@ async function stopLocationUpdatesIfIdle() {
 }
 
 async function ensureLocationUpdatesRunning() {
-  if (activeEvents.length === 0 || locationSubscription) {
+  if (activeEvents.length === 0) {
     return;
   }
 
@@ -98,37 +192,42 @@ async function ensureLocationUpdatesRunning() {
     return;
   }
 
-  locationSubscription = await Location.watchPositionAsync(
-    {
-      accuracy: Location.Accuracy.High,
-      timeInterval: LOCATION_UPDATE_INTERVAL_MS,
-      distanceInterval: LOCATION_DISTANCE_INTERVAL_METERS,
-    },
-    (position) => {
-      void updatePresenceForPosition(position.coords.latitude, position.coords.longitude);
-    }
-  );
+  if (!locationSubscription) {
+    locationSubscription = await Location.watchPositionAsync(
+      {
+        accuracy: Location.Accuracy.High,
+        timeInterval: LOCATION_UPDATE_INTERVAL_MS,
+        distanceInterval: LOCATION_DISTANCE_INTERVAL_METERS,
+      },
+      (position) => {
+        void updatePresenceForPosition(position.coords.latitude, position.coords.longitude);
+      }
+    );
+  }
 
-  Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
-    .then((position) => updatePresenceForPosition(position.coords.latitude, position.coords.longitude))
-    .catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : "Could not read current location.";
-      console.warn("[EventPresence] Could not read initial position:", message);
-    });
+  try {
+    const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+    await updatePresenceForPosition(position.coords.latitude, position.coords.longitude);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Could not read current location.";
+    console.warn("[EventPresence] Could not read initial position:", message);
+  }
 }
 
 async function refreshPresenceTracking() {
-  const eligibleEvents = await fetchEligiblePresenceEvents();
-  if (!eligibleEvents) {
+  const snapshot = await fetchEligiblePresenceEvents();
+  if (!snapshot) {
     activeEvents = [];
     activeUserId = null;
     await stopLocationUpdatesIfIdle();
     return;
   }
 
-  activeEvents = eligibleEvents;
+  activeEvents = snapshot.activePresenceEvents;
   await stopLocationUpdatesIfIdle();
   await ensureLocationUpdatesRunning();
+  await maybeNotifyMissingParticipants(snapshot.attendingEvents);
+  await maybeNotifyCapacityWarnings(snapshot.hostingEvents);
 }
 
 function handleAppStateChange(state: AppStateStatus) {
@@ -179,6 +278,9 @@ export function stopOpenAppEventPresenceTracking() {
   activeEvents = [];
   activeUserId = null;
   hasRequestedLocationPermission = false;
+  missingReminderEventIds.clear();
+  capacityWarningEventIds.clear();
+  endedByHostLeaveEventIds.clear();
 
   locationSubscription?.remove();
   locationSubscription = null;
