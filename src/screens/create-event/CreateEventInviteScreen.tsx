@@ -434,11 +434,11 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
             ))}
           </View>
 
-          <Text style={styles.settingLabel}>Attendance counting</Text>
+          <Text style={styles.settingLabel}>Event behavior</Text>
           <View style={styles.toggleRow}>
             {[
-              { label: "Off", value: false },
-              { label: "On", value: true },
+              { label: "Basic", value: false },
+              { label: "Configurable", value: true },
             ].map((option) => (
               <Pressable
                 key={option.label}
@@ -452,7 +452,7 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
             ))}
           </View>
           {attendanceCountingEnabled ? (
-            <Text style={styles.helperText}>A setup step will be added so you can choose GPS geofence or BLE beacon attendance.</Text>
+            <Text style={styles.helperText}>Add presence detection and trigger rules for this event.</Text>
           ) : null}
 
         </View>
@@ -540,7 +540,7 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
             {creatingEvent
               ? "Creating..."
               : attendanceCountingEnabled
-                ? "Choose attendance method"
+                ? "Configure behavior"
                 : visibility === "Public"
                   ? "Publish event"
                   : "Create event"}

@@ -1,16 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import * as Calendar from "expo-calendar";
 import type { RootStackParamList } from "../../../App";
 import EventInviteStatusSection from "../../components/EventInviteStatusSection";
+import ProfileAvatar from "../../components/ProfileAvatar";
 import {
-  autoCheckInWithGpsGeofence,
-  canUseGpsAttendance,
-  fetchEventAttendanceCount,
-  isEventOngoing,
-} from "../../data/eventAttendance";
+  fetchEventRuntimeStatus,
+  type EventPresencePerson,
+  type EventRuntimeSeverity,
+  type EventRuntimeStatus,
+} from "../../data/eventRules";
 import { deleteHostedEvent, fetchEventBuckets, leaveEvent, type EventItem } from "../../data/eventStore";
+import { getProfileInitials } from "../../profile";
 import { supabase } from "../../supabase";
 
 type Props = NativeStackScreenProps<RootStackParamList, "EventDetails">;
@@ -21,9 +23,9 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processingAction, setProcessingAction] = useState(false);
-  const [attendanceCount, setAttendanceCount] = useState(0);
-  const [attendanceStatus, setAttendanceStatus] = useState<string | null>(null);
-  const autoAttendanceEventRef = useRef<string | null>(null);
+  const [runtimeStatus, setRuntimeStatus] = useState<EventRuntimeStatus | null>(null);
+  const [runtimeLoading, setRuntimeLoading] = useState(false);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
 
   const loadEvent = useCallback(async () => {
     setError(null);
@@ -52,32 +54,39 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
     void loadEvent();
   }, [loadEvent]);
 
-  const loadAttendanceCount = useCallback(async () => {
-    const { count, error: attendanceError } = await fetchEventAttendanceCount(eventId);
-    if (attendanceError) {
-      setAttendanceStatus(attendanceError);
+  const loadRuntimeStatus = useCallback(async () => {
+    if (!event?.attendanceEnabled) {
+      setRuntimeStatus(null);
+      setRuntimeError(null);
       return;
     }
 
-    setAttendanceCount(count);
-  }, [eventId]);
+    setRuntimeLoading(true);
+    const { data, error: runtimeFetchError } = await fetchEventRuntimeStatus({
+      event,
+      viewerRole: source,
+    });
+    setRuntimeStatus(data);
+    setRuntimeError(runtimeFetchError);
+    setRuntimeLoading(false);
+  }, [event, source]);
 
   useEffect(() => {
     if (!event?.attendanceEnabled) {
-      setAttendanceCount(0);
-      setAttendanceStatus(null);
+      setRuntimeStatus(null);
+      setRuntimeError(null);
       return;
     }
 
-    void loadAttendanceCount();
-  }, [event, loadAttendanceCount]);
+    void loadRuntimeStatus();
+  }, [event, loadRuntimeStatus]);
 
   useEffect(() => {
-    if (!event?.attendanceEnabled || !isEventOngoing(event)) {
+    if (!event?.attendanceEnabled) {
       return;
     }
 
-    const channel = supabase
+    const attendanceChannel = supabase
       .channel(`event-attendance:${event.id}`)
       .on(
         "postgres_changes",
@@ -88,68 +97,54 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
           filter: `event_id=eq.${event.id}`,
         },
         () => {
-          void loadAttendanceCount();
+          void loadRuntimeStatus();
+        }
+      )
+      .subscribe();
+
+    const inviteChannel = supabase
+      .channel(`event-invites:${event.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "event_invites",
+          filter: `event_id=eq.${event.id}`,
+        },
+        () => {
+          void loadRuntimeStatus();
+        }
+      )
+      .subscribe();
+
+    const liveLocationChannel = supabase
+      .channel(`event-live-locations-status:${event.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "event_live_locations",
+          filter: `event_id=eq.${event.id}`,
+        },
+        () => {
+          void loadRuntimeStatus();
         }
       )
       .subscribe();
 
     const refreshHandle = setInterval(() => {
-      void loadAttendanceCount();
+      void loadRuntimeStatus();
     }, 15000);
 
     return () => {
       clearInterval(refreshHandle);
-      void supabase.removeChannel(channel);
+      void supabase.removeChannel(attendanceChannel);
+      void supabase.removeChannel(inviteChannel);
+      void supabase.removeChannel(liveLocationChannel);
     };
-  }, [event, loadAttendanceCount]);
-
-  useEffect(() => {
-    if (!event || source !== "attending" || autoAttendanceEventRef.current === event.id) {
-      return;
-    }
-
-    if (!isEventOngoing(event) || !canUseGpsAttendance(event)) {
-      return;
-    }
-
-    const activeEvent = event;
-    autoAttendanceEventRef.current = activeEvent.id;
-    let isMounted = true;
-
-    async function runAutomaticAttendance() {
-      const result = await autoCheckInWithGpsGeofence(activeEvent);
-
-      if (!isMounted) {
-        return;
-      }
-
-      if (result.status === "checked_in") {
-        setAttendanceStatus("You are counted as present.");
-        await loadAttendanceCount();
-        return;
-      }
-
-      if (result.status === "already_checked_in") {
-        setAttendanceStatus("You are counted as present.");
-        return;
-      }
-
-      if (result.status === "outside_geofence") {
-        setAttendanceStatus(`You are ${Math.round(result.distanceMeters)} m away. Attendance radius is ${result.radiusMeters} m.`);
-        return;
-      }
-
-      if (result.status === "error") {
-        setAttendanceStatus(result.reason);
-      }
-    }
-
-    void runAutomaticAttendance();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [event, loadAttendanceCount, source]);
+  }, [event, loadRuntimeStatus]);
 
   function openMap() {
     if (!event) {
@@ -259,14 +254,53 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
 
       {event ? (
         <>
-          {event.attendanceEnabled && isEventOngoing(event) ? (
-            <View style={styles.liveAttendanceCard}>
-              <View style={styles.liveAttendanceHeader}>
+          {event.attendanceEnabled ? (
+            <View style={[styles.eventStatusCard, getStatusCardStyle(runtimeStatus?.severity)]}>
+              <View style={styles.eventStatusHeader}>
                 <View style={styles.liveDot} />
-                <Text style={styles.liveAttendanceLabel}>Live attendance</Text>
+                <Text style={styles.eventStatusLabel}>Event status</Text>
               </View>
-              <Text style={styles.liveAttendanceCount}>{attendanceCount} present</Text>
-              {attendanceStatus ? <Text style={styles.liveAttendanceStatus}>{attendanceStatus}</Text> : null}
+              <Text style={styles.eventStatusTitle}>
+                {runtimeLoading && !runtimeStatus ? "Loading event status..." : runtimeStatus?.title ?? "Event status unavailable"}
+              </Text>
+              {runtimeStatus ? <Text style={styles.eventStatusMessage}>{runtimeStatus.message}</Text> : null}
+              <View style={styles.statusPillRow}>
+                <View style={styles.statusPill}>
+                  <Text style={styles.statusPillText}>{getPresenceMethodLabel(event)}</Text>
+                </View>
+                {runtimeStatus?.canShowLiveState ? (
+                  <>
+                    <View style={styles.statusPill}>
+                      <Text style={styles.statusPillText}>{runtimeStatus.presentCount} present</Text>
+                    </View>
+                    <View style={styles.statusPill}>
+                      <Text style={styles.statusPillText}>{runtimeStatus.hostPresent ? "Host present" : "Host missing"}</Text>
+                    </View>
+                    {runtimeStatus.minimumPresentCount ? (
+                      <View style={styles.statusPill}>
+                        <Text style={styles.statusPillText}>Need {runtimeStatus.minimumPresentCount}</Text>
+                      </View>
+                    ) : null}
+                    {runtimeStatus.capacityLimit ? (
+                      <View style={styles.statusPill}>
+                        <Text style={styles.statusPillText}>Cap {runtimeStatus.capacityLimit}</Text>
+                      </View>
+                    ) : null}
+                  </>
+                ) : (
+                  <View style={styles.statusPill}>
+                    <Text style={styles.statusPillText}>Updates near start</Text>
+                  </View>
+                )}
+              </View>
+              {runtimeError ? <Text style={styles.liveAttendanceStatus}>{runtimeError}</Text> : null}
+            </View>
+          ) : null}
+
+          {event.attendanceEnabled && runtimeStatus?.canShowLiveState ? (
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Your presence</Text>
+              <PersonalPresenceCard presence={runtimeStatus.viewerPresence} />
             </View>
           ) : null}
 
@@ -303,6 +337,30 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
             <EventInviteStatusSection eventId={event.id} />
           </View>
 
+          {source === "hosting" && event.attendanceEnabled && runtimeStatus?.canShowLiveState ? (
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Missing accepted participants</Text>
+              <PresenceExceptionList
+                people={runtimeStatus.missingParticipants}
+                emptyText="No accepted participants are still waiting to arrive."
+                badgeLabel="Missing"
+                badgeTone="danger"
+              />
+            </View>
+          ) : null}
+
+          {source === "hosting" && event.attendanceEnabled && runtimeStatus?.canShowLiveState ? (
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Left or inactive location</Text>
+              <PresenceExceptionList
+                people={runtimeStatus.leftParticipants}
+                emptyText="No previously present participants have left the event area."
+                badgeLabel="Left"
+                badgeTone="warning"
+              />
+            </View>
+          ) : null}
+
           {source === "attending" ? (
             <View style={styles.actionRow}>
               <Pressable style={styles.secondaryButton} onPress={confirmLeaveEvent} disabled={processingAction}>
@@ -333,6 +391,150 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function PersonalPresenceCard({ presence }: { presence: EventPresencePerson | null }) {
+  const model = getPersonalPresenceModel(presence);
+
+  return (
+    <View style={[styles.personalPresenceCard, model.tone === "success" && styles.personalPresenceSuccess, model.tone === "warning" && styles.personalPresenceWarning]}>
+      <View style={styles.personalPresenceHeader}>
+        <View style={[styles.personalPresenceDot, model.tone === "warning" && styles.personalPresenceDotWarning]} />
+        <Text style={styles.personalPresenceTitle}>{model.title}</Text>
+      </View>
+      <Text style={styles.personalPresenceText}>{model.message}</Text>
+      {presence?.distanceMeters !== null && presence?.distanceMeters !== undefined ? (
+        <Text style={styles.personalPresenceMeta}>{Math.round(presence.distanceMeters)} m from the event location</Text>
+      ) : null}
+    </View>
+  );
+}
+
+function PresenceExceptionList({
+  people,
+  emptyText,
+  badgeLabel,
+  badgeTone,
+}: {
+  people: EventPresencePerson[];
+  emptyText: string;
+  badgeLabel: string;
+  badgeTone: "danger" | "warning";
+}) {
+  if (people.length === 0) {
+    return <Text style={styles.emptyText}>{emptyText}</Text>;
+  }
+
+  return (
+    <View style={styles.missingList}>
+      {people.map((participant) => (
+        <PresenceExceptionRow
+          key={participant.id}
+          participant={participant}
+          badgeLabel={badgeLabel}
+          badgeTone={badgeTone}
+        />
+      ))}
+    </View>
+  );
+}
+
+function PresenceExceptionRow({
+  participant,
+  badgeLabel,
+  badgeTone,
+}: {
+  participant: EventPresencePerson;
+  badgeLabel: string;
+  badgeTone: "danger" | "warning";
+}) {
+  return (
+    <View style={styles.missingRow}>
+      <ProfileAvatar
+        avatarUrl={participant.avatarUrl}
+        initials={getProfileInitials(participant.name, participant.username)}
+        size={42}
+      />
+      <View style={styles.missingTextWrap}>
+        <Text style={styles.missingName} numberOfLines={1}>
+          {participant.name}
+        </Text>
+        {participant.username ? <Text style={styles.missingUsername}>@{participant.username}</Text> : null}
+        {participant.distanceMeters !== null ? (
+          <Text style={styles.missingMeta}>{Math.round(participant.distanceMeters)} m from event area</Text>
+        ) : participant.lastLocationAt ? (
+          <Text style={styles.missingMeta}>Location inactive</Text>
+        ) : null}
+      </View>
+      <View style={[styles.missingBadge, badgeTone === "warning" && styles.leftBadge]}>
+        <Text style={[styles.missingBadgeText, badgeTone === "warning" && styles.leftBadgeText]}>{badgeLabel}</Text>
+      </View>
+    </View>
+  );
+}
+
+function getPersonalPresenceModel(presence: EventPresencePerson | null) {
+  if (!presence) {
+    return {
+      tone: "warning" as const,
+      title: "Not connected to this event",
+      message: "Your account is not currently listed as host or accepted participant.",
+    };
+  }
+
+  if (presence.presenceState === "present") {
+    return {
+      tone: "success" as const,
+      title: "You are present",
+      message: presence.isHost ? "Your host presence can activate the event." : "You are currently inside the event area.",
+    };
+  }
+
+  if (presence.presenceState === "not_arrived") {
+    return {
+      tone: "warning" as const,
+      title: "You are not present yet",
+      message: "Keep the app open near the event area so your presence can update.",
+    };
+  }
+
+  if (presence.presenceState === "left") {
+    return {
+      tone: "warning" as const,
+      title: "You left the event area",
+      message: "Your latest location is outside the configured event radius.",
+    };
+  }
+
+  return {
+    tone: "warning" as const,
+    title: "Location inactive",
+    message: "Your last event location update is stale. Keep the app open to refresh your presence.",
+  };
+}
+
+function getPresenceMethodLabel(event: EventItem) {
+  if (event.attendanceMethod === "gps_geofence") {
+    return "GPS area";
+  }
+
+  return "Presence rule";
+}
+
+function getStatusCardStyle(severity: EventRuntimeSeverity | undefined) {
+  if (severity === "danger") {
+    return styles.eventStatusDanger;
+  }
+
+  if (severity === "warning") {
+    return styles.eventStatusWarning;
+  }
+
+  if (severity === "success") {
+    return styles.eventStatusSuccess;
+  }
+
+  return styles.eventStatusNeutral;
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f7f1e8" },
   content: { padding: 20, paddingBottom: 120 },
@@ -353,15 +555,29 @@ const styles = StyleSheet.create({
   heroTitle: { flex: 1, color: "#1f1a17", fontSize: 28, fontWeight: "800" },
   heroSubtitle: { color: "#67594d", fontSize: 15, lineHeight: 22 },
   heroActionRow: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 16 },
-  liveAttendanceCard: {
-    backgroundColor: "#fff4f1",
+  eventStatusCard: {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#f0c6c0",
     padding: 16,
     marginBottom: 12,
   },
-  liveAttendanceHeader: {
+  eventStatusNeutral: {
+    backgroundColor: "#f3eee7",
+    borderColor: "#e2d6c6",
+  },
+  eventStatusWarning: {
+    backgroundColor: "#fff6ea",
+    borderColor: "#ead1a3",
+  },
+  eventStatusSuccess: {
+    backgroundColor: "#edf4ee",
+    borderColor: "#cfe0d2",
+  },
+  eventStatusDanger: {
+    backgroundColor: "#fff4f1",
+    borderColor: "#f0c6c0",
+  },
+  eventStatusHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
@@ -371,25 +587,51 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: "#d92d20",
+    backgroundColor: "#2f5d50",
   },
-  liveAttendanceLabel: {
-    color: "#a23d3d",
+  eventStatusLabel: {
+    color: "#2f5d50",
     fontSize: 12,
     fontWeight: "800",
     textTransform: "uppercase",
   },
-  liveAttendanceCount: {
-    color: "#d92d20",
+  eventStatusTitle: {
+    color: "#173d33",
     fontSize: 24,
     fontWeight: "900",
   },
+  eventStatusMessage: {
+    color: "#36574b",
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 19,
+    marginTop: 5,
+  },
+  statusPillRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 10,
+  },
+  statusPill: {
+    borderWidth: 1,
+    borderColor: "#c9dacd",
+    borderRadius: 999,
+    backgroundColor: "#fffaf4",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  statusPillText: {
+    color: "#36574b",
+    fontSize: 11,
+    fontWeight: "800",
+  },
   liveAttendanceStatus: {
-    color: "#a23d3d",
+    color: "#36574b",
     fontSize: 13,
     fontWeight: "600",
     lineHeight: 18,
-    marginTop: 4,
+    marginTop: 10,
   },
   card: {
     backgroundColor: "#fffaf4",
@@ -400,6 +642,101 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: { fontSize: 18, fontWeight: "800", color: "#201c19", marginBottom: 10 },
+  personalPresenceCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#eadfce",
+    backgroundColor: "#fff6ea",
+    padding: 14,
+  },
+  personalPresenceSuccess: {
+    borderColor: "#cfe0d2",
+    backgroundColor: "#edf4ee",
+  },
+  personalPresenceWarning: {
+    borderColor: "#ead1a3",
+    backgroundColor: "#fff6ea",
+  },
+  personalPresenceHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 6,
+  },
+  personalPresenceDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: "#2f5d50",
+  },
+  personalPresenceDotWarning: {
+    backgroundColor: "#c97a15",
+  },
+  personalPresenceTitle: {
+    color: "#201c19",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  personalPresenceText: {
+    color: "#5f5145",
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 19,
+  },
+  personalPresenceMeta: {
+    color: "#6f6258",
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: 8,
+  },
+  emptyText: { color: "#6f6258", fontSize: 13, lineHeight: 19 },
+  missingList: {
+    gap: 0,
+  },
+  missingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: "#efe4d7",
+  },
+  missingTextWrap: {
+    flex: 1,
+  },
+  missingName: {
+    color: "#201c19",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  missingUsername: {
+    color: "#6f6258",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  missingMeta: {
+    color: "#8a7f74",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 3,
+  },
+  missingBadge: {
+    backgroundColor: "#fff1f1",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  leftBadge: {
+    backgroundColor: "#fff6ea",
+  },
+  missingBadgeText: {
+    color: "#a23d3d",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  leftBadgeText: {
+    color: "#8a5a12",
+  },
   infoRow: { paddingVertical: 8 },
   infoLabel: { fontSize: 12, color: "#6f6258", fontWeight: "800", textTransform: "uppercase" },
   infoValue: { marginTop: 4, fontSize: 15, color: "#201c19", fontWeight: "600", lineHeight: 20 },

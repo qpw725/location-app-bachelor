@@ -9,6 +9,16 @@ export type GpsAttendanceResult =
   | { status: "not_available"; reason: string }
   | { status: "error"; reason: string };
 
+export type GpsPresenceWatchResult = GpsAttendanceResult | { status: "watching" };
+
+export type GpsPresenceWatch = {
+  stop: () => void;
+};
+
+type GpsPresenceAvailability = {
+  userId: string;
+};
+
 export function isEventOngoing(event: Pick<EventItem, "startAt" | "endAt">) {
   if (!event.startAt || !event.endAt) {
     return false;
@@ -16,6 +26,15 @@ export function isEventOngoing(event: Pick<EventItem, "startAt" | "endAt">) {
 
   const now = Date.now();
   return now >= event.startAt.getTime() && now <= event.endAt.getTime();
+}
+
+export function isEventPresenceWindowOpen(event: Pick<EventItem, "startAt" | "endAt">, leadMinutes = 60) {
+  if (!event.startAt || !event.endAt) {
+    return false;
+  }
+
+  const now = Date.now();
+  return now >= event.startAt.getTime() - leadMinutes * 60 * 1000 && now <= event.endAt.getTime();
 }
 
 export function canUseGpsAttendance(event: EventItem) {
@@ -43,20 +62,93 @@ export async function fetchEventAttendanceCount(eventId: string): Promise<{ coun
 }
 
 export async function autoCheckInWithGpsGeofence(event: EventItem): Promise<GpsAttendanceResult> {
+  const availability = await prepareGpsPresenceCheck(event);
+  if ("status" in availability) {
+    return availability;
+  }
+
+  const position = await Location.getCurrentPositionAsync({
+    accuracy: Location.Accuracy.High,
+  });
+
+  return updateGpsPresenceFromCoordinates(event, availability.userId, position.coords.latitude, position.coords.longitude);
+}
+
+export async function startGpsPresenceWatch(
+  event: EventItem,
+  onUpdate: (result: GpsPresenceWatchResult) => void
+): Promise<GpsPresenceWatch> {
+  const availability = await prepareGpsPresenceCheck(event, { allowExistingAttendance: true });
+  if ("status" in availability) {
+    onUpdate(availability);
+    return { stop: () => {} };
+  }
+
+  const userId = availability.userId;
+  let stopped = false;
+  let subscription: Location.LocationSubscription | null = null;
+
+  async function handlePosition(latitude: number, longitude: number) {
+    if (stopped) {
+      return;
+    }
+
+    const result = await updateGpsPresenceFromCoordinates(event, userId, latitude, longitude);
+    if (stopped) {
+      return;
+    }
+
+    onUpdate(result);
+  }
+
+  onUpdate({ status: "watching" });
+
+  subscription = await Location.watchPositionAsync(
+    {
+      accuracy: Location.Accuracy.High,
+      timeInterval: 10000,
+      distanceInterval: Math.max(10, Math.min(50, Math.round((event.attendanceRadiusMeters ?? 75) / 4))),
+    },
+    (position) => {
+      void handlePosition(position.coords.latitude, position.coords.longitude);
+    }
+  );
+
+  Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
+    .then((position) => handlePosition(position.coords.latitude, position.coords.longitude))
+    .catch((error: unknown) => {
+      if (!stopped) {
+        onUpdate({ status: "error", reason: getErrorMessage(error) });
+      }
+    });
+
+  return {
+    stop: () => {
+      stopped = true;
+      subscription?.remove();
+      subscription = null;
+    },
+  };
+}
+
+async function prepareGpsPresenceCheck(
+  event: EventItem,
+  options: { allowExistingAttendance?: boolean } = {}
+): Promise<GpsPresenceAvailability | GpsAttendanceResult> {
   if (!event.attendanceEnabled) {
-    return { status: "not_available", reason: "Attendance counting is not enabled for this event." };
+    return { status: "not_available", reason: "Presence detection is not enabled for this event." };
   }
 
   if (event.attendanceMethod !== "gps_geofence") {
-    return { status: "not_available", reason: "This event is not using GPS attendance." };
+    return { status: "not_available", reason: "This event is not using GPS presence detection." };
   }
 
-  if (!isEventOngoing(event)) {
-    return { status: "not_available", reason: "Attendance is only counted while the event is ongoing." };
+  if (!isEventPresenceWindowOpen(event)) {
+    return { status: "not_available", reason: "Presence can only be marked shortly before or during the event." };
   }
 
   if (!canUseGpsAttendance(event)) {
-    return { status: "not_available", reason: "This event is missing GPS attendance settings." };
+    return { status: "not_available", reason: "This event is missing GPS presence settings." };
   }
 
   const {
@@ -83,7 +175,7 @@ export async function autoCheckInWithGpsGeofence(event: EventItem): Promise<GpsA
     return { status: "error", reason: existingError.message };
   }
 
-  if (existingAttendance) {
+  if (existingAttendance && !options.allowExistingAttendance) {
     return { status: "already_checked_in" };
   }
 
@@ -93,16 +185,38 @@ export async function autoCheckInWithGpsGeofence(event: EventItem): Promise<GpsA
   }
 
   if (!permission.granted) {
-    return { status: "not_available", reason: "Location permission is needed to count GPS attendance." };
+    return { status: "not_available", reason: "Location permission is needed to mark presence." };
   }
 
-  const position = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.High,
-  });
+  return { userId: user.id };
+}
+
+export async function updateGpsPresenceFromCoordinates(
+  event: EventItem,
+  userId: string,
+  latitude: number,
+  longitude: number
+): Promise<GpsAttendanceResult> {
+  const { error: liveLocationError } = await supabase.from("event_live_locations").upsert(
+    [
+      {
+        event_id: event.id,
+        user_id: userId,
+        latitude,
+        longitude,
+        updated_at: new Date().toISOString(),
+      },
+    ],
+    { onConflict: "event_id,user_id" }
+  );
+
+  if (liveLocationError) {
+    return { status: "error", reason: liveLocationError.message };
+  }
 
   const distanceMeters = getDistanceMeters(
-    position.coords.latitude,
-    position.coords.longitude,
+    latitude,
+    longitude,
     event.latitude!,
     event.longitude!
   );
@@ -116,7 +230,7 @@ export async function autoCheckInWithGpsGeofence(event: EventItem): Promise<GpsA
     [
       {
         event_id: event.id,
-        user_id: user.id,
+        user_id: userId,
         checked_in_at: new Date().toISOString(),
         method: "gps_geofence",
       },
@@ -129,6 +243,14 @@ export async function autoCheckInWithGpsGeofence(event: EventItem): Promise<GpsA
   }
 
   return { status: "checked_in", distanceMeters };
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Could not read current location.";
 }
 
 function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) {

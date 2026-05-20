@@ -1,12 +1,14 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import type { EventRuntimeSeverity, EventRuntimeStatus } from "../data/eventRules";
 import type { EventItem } from "../data/eventStore";
 
 type EventSummaryCardProps = {
   event: EventItem;
+  runtimeStatus?: EventRuntimeStatus | null;
   onPress: () => void;
 };
 
-export function EventSummaryCard({ event, onPress }: EventSummaryCardProps) {
+export function EventSummaryCard({ event, runtimeStatus, onPress }: EventSummaryCardProps) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.summaryCard, pressed && styles.pressed]}>
       <View style={styles.summaryHeader}>
@@ -21,12 +23,59 @@ export function EventSummaryCard({ event, onPress }: EventSummaryCardProps) {
 
       <View style={styles.summaryDivider} />
 
+      {event.attendanceEnabled ? (
+        <View style={styles.statusRow}>
+          <View style={[styles.statusBadge, getRuntimeStatusBadgeStyle(runtimeStatus?.severity)]}>
+            <Text style={[styles.statusText, getRuntimeStatusTextStyle(runtimeStatus?.severity)]}>
+              {getRuntimeStatusLabel(runtimeStatus)}
+            </Text>
+          </View>
+          {runtimeStatus?.canShowLiveState ? (
+            <Text style={styles.statusMeta} numberOfLines={1}>
+              {runtimeStatus.presentCount} present
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
       <View style={styles.summaryFooter}>
         <Text style={styles.summaryMeta} numberOfLines={1}>Hosted by {event.host}</Text>
         <Text style={styles.summaryGenre} numberOfLines={1}>{event.genre}</Text>
       </View>
     </Pressable>
   );
+}
+
+function getRuntimeStatusLabel(status: EventRuntimeStatus | null | undefined) {
+  if (!status) {
+    return "Behavior configured";
+  }
+
+  if (status.status === "hidden") return "Updates near start";
+  if (status.status === "not_started") return "Not started";
+  if (status.status === "host_not_arrived") return "Host not arrived";
+  if (status.status === "host_left") return "Host left";
+  if (status.status === "not_enough_participants") return "Needs participants";
+  if (status.status === "event_full") return "Full";
+  if (status.status === "ready") return "Ready";
+  if (status.status === "active") return "Active";
+  if (status.status === "ended") return "Ended";
+
+  return "Event status";
+}
+
+function getRuntimeStatusBadgeStyle(severity: EventRuntimeSeverity | undefined) {
+  if (severity === "danger") return styles.statusBadgeDanger;
+  if (severity === "warning") return styles.statusBadgeWarning;
+  if (severity === "success") return styles.statusBadgeSuccess;
+  return styles.statusBadgeNeutral;
+}
+
+function getRuntimeStatusTextStyle(severity: EventRuntimeSeverity | undefined) {
+  if (severity === "danger") return styles.statusTextDanger;
+  if (severity === "warning") return styles.statusTextWarning;
+  if (severity === "success") return styles.statusTextSuccess;
+  return styles.statusTextNeutral;
 }
 
 const styles = StyleSheet.create({
@@ -63,6 +112,53 @@ const styles = StyleSheet.create({
     backgroundColor: "#2d2926",
     opacity: 0.18,
     marginTop: 18,
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    marginTop: 10,
+  },
+  statusBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  statusBadgeNeutral: {
+    backgroundColor: "#f3eee7",
+  },
+  statusBadgeWarning: {
+    backgroundColor: "#fff6ea",
+  },
+  statusBadgeSuccess: {
+    backgroundColor: "#edf4ee",
+  },
+  statusBadgeDanger: {
+    backgroundColor: "#fff1f1",
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  statusTextNeutral: {
+    color: "#6f6258",
+  },
+  statusTextWarning: {
+    color: "#8a5a12",
+  },
+  statusTextSuccess: {
+    color: "#2f5d50",
+  },
+  statusTextDanger: {
+    color: "#a23d3d",
+  },
+  statusMeta: {
+    flex: 1,
+    color: "#6f6258",
+    fontSize: 12,
+    fontWeight: "800",
+    textAlign: "right",
   },
   summaryFooter: {
     flexDirection: "row",

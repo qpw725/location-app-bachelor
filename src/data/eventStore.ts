@@ -1,6 +1,7 @@
 import { supabase } from "../supabase";
 import { stopEventLocationSharing } from "../locationSharingManager";
 import { getAvatarPublicUrl } from "../profile";
+import { fetchEventCapacityLimit } from "./eventRules";
 
 type DbEventRow = {
   id: string;
@@ -326,6 +327,22 @@ export async function joinPublicEvent(eventId: string): Promise<{ error: string 
   const eventEndTime = event.end_time ? new Date(event.end_time).getTime() : event.start_time ? new Date(event.start_time).getTime() : NaN;
   if (!Number.isNaN(eventEndTime) && eventEndTime < Date.now()) {
     return { error: "This event has already ended." };
+  }
+
+  const capacityLimit = await fetchEventCapacityLimit(eventId);
+  if (capacityLimit) {
+    const { count, error: attendanceCountError } = await supabase
+      .from("event_attendance")
+      .select("event_id", { count: "exact", head: true })
+      .eq("event_id", eventId);
+
+    if (attendanceCountError) {
+      return { error: attendanceCountError.message };
+    }
+
+    if ((count ?? 0) >= capacityLimit) {
+      return { error: "This event is full." };
+    }
   }
 
   const { error: joinError } = await supabase

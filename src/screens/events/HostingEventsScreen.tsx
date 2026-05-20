@@ -3,6 +3,7 @@ import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View }
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../../App";
 import { EventSummaryCard } from "../../components/EventListViews";
+import { fetchEventRuntimeStatus, type EventRuntimeStatus } from "../../data/eventRules";
 import { fetchEventBuckets, type EventItem } from "../../data/eventStore";
 
 type Props = NativeStackScreenProps<RootStackParamList, "HostingEvents">;
@@ -12,9 +13,11 @@ export default function HostingEventsScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [eventStatuses, setEventStatuses] = useState<Record<string, EventRuntimeStatus>>({});
 
   const loadEvents = useCallback(async () => {
     setError(null);
+    setEventStatuses({});
     const { data, error: fetchError } = await fetchEventBuckets();
     if (fetchError || !data) {
       setError(fetchError ?? "Could not load hosting events.");
@@ -24,6 +27,17 @@ export default function HostingEventsScreen({ navigation }: Props) {
 
     setEvents(data.hostingEvents);
     setLoading(false);
+
+    const statusPairs = await Promise.all(
+      data.hostingEvents
+        .filter((event) => event.attendanceEnabled)
+        .map(async (event) => {
+          const { data: status } = await fetchEventRuntimeStatus({ event, viewerRole: "hosting" });
+          return status ? ([event.id, status] as const) : null;
+        })
+    );
+
+    setEventStatuses(Object.fromEntries(statusPairs.filter((pair): pair is readonly [string, EventRuntimeStatus] => pair !== null)));
   }, []);
 
   useEffect(() => {
@@ -72,6 +86,7 @@ export default function HostingEventsScreen({ navigation }: Props) {
         <EventSummaryCard
           key={event.id}
           event={event}
+          runtimeStatus={eventStatuses[event.id] ?? null}
           onPress={() => navigation.navigate("EventDetails", { eventId: event.id, source: "hosting" })}
         />
       ))}

@@ -1,15 +1,16 @@
 import { useMemo, useState } from "react";
 import { CommonActions } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import Slider from "@react-native-community/slider";
 import type { EventAttendanceMethod, RootStackParamList } from "../../../App";
 import StepIndicator from "../../components/StepIndicator";
+import { saveEventBehaviorTriggers, type EventTriggerInput } from "../../data/eventRules";
 import { supabase } from "../../supabase";
 
 type Props = NativeStackScreenProps<RootStackParamList, "CreateEventAttendance">;
 
-const attendanceOptions: Array<{
+const presenceOptions: Array<{
   method: EventAttendanceMethod;
   title: string;
   eyebrow: string;
@@ -17,15 +18,48 @@ const attendanceOptions: Array<{
 }> = [
   {
     method: "gps_geofence",
-    title: "GPS geofence",
-    eyebrow: "Bigger locations",
-    description: "Best for outdoor events, large buildings, and venues where a wider location radius is acceptable.",
+    title: "GPS event area",
+    eyebrow: "Location radius",
+    description: "Uses the event location and radius to mark people as present when they are inside the area.",
+  },
+];
+
+type BehaviorRuleId =
+  | "participant_enters_area"
+  | "host_enters_area"
+  | "minimum_present"
+  | "missing_after_start"
+  | "capacity_warning";
+
+const behaviorRules: Array<{
+  id: BehaviorRuleId;
+  title: string;
+  description: string;
+}> = [
+  {
+    id: "participant_enters_area",
+    title: "Participant enters area",
+    description: "Participants can be marked present when they are inside the event area.",
   },
   {
-    method: "ble_beacon",
-    title: "Bluetooth beacon",
-    eyebrow: "Rooms and meetings",
-    description: "Best for classrooms, offices, and smaller spaces where attendees should be physically close to the host phone.",
+    id: "host_enters_area",
+    title: "Host enters area",
+    description: "The event can become active when the host is physically present.",
+  },
+  {
+    id: "minimum_present",
+    title: "Minimum participants present",
+    description: "The event can be marked ready when enough participants have arrived.",
+  },
+  {
+    id: "missing_after_start",
+    title: "Missing participants",
+    description: "The host can see accepted participants who are not present after the event starts.",
+  },
+  {
+    id: "capacity_warning",
+    title: "Capacity warning",
+    description: "The host can be warned when the present count reaches a selected limit.",
   },
 ];
 
@@ -52,14 +86,55 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
   const [selectedMethod, setSelectedMethod] = useState<EventAttendanceMethod>("gps_geofence");
   const [attendanceRadiusMeters, setAttendanceRadiusMeters] = useState(75);
   const [attendanceRadiusInput, setAttendanceRadiusInput] = useState("75");
+  const [enabledRules, setEnabledRules] = useState<Record<BehaviorRuleId, boolean>>({
+    participant_enters_area: true,
+    host_enters_area: true,
+    minimum_present: false,
+    missing_after_start: true,
+    capacity_warning: false,
+  });
+  const [minimumPresentCount, setMinimumPresentCount] = useState("4");
+  const [missingAfterMinutes, setMissingAfterMinutes] = useState("10");
+  const [capacityWarningCount, setCapacityWarningCount] = useState("30");
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [createEventError, setCreateEventError] = useState<string | null>(null);
   const [createEventSuccess, setCreateEventSuccess] = useState<string | null>(null);
 
-  const selectedOption = useMemo(
-    () => attendanceOptions.find((option) => option.method === selectedMethod) ?? attendanceOptions[0],
+  const selectedPresenceOption = useMemo(
+    () => presenceOptions.find((option) => option.method === selectedMethod) ?? presenceOptions[0],
     [selectedMethod]
   );
+
+  const enabledRuleCount = useMemo(
+    () => Object.values(enabledRules).filter(Boolean).length,
+    [enabledRules]
+  );
+
+  const selectedRuleSummaries = useMemo(() => {
+    const summaries: string[] = [];
+
+    if (enabledRules.participant_enters_area) {
+      summaries.push(`Mark participants present inside ${attendanceRadiusMeters} m`);
+    }
+
+    if (enabledRules.host_enters_area) {
+      summaries.push("Event can become active when the host is present");
+    }
+
+    if (enabledRules.minimum_present) {
+      summaries.push(`Ready when ${minimumPresentCount || "0"} participants are present`);
+    }
+
+    if (enabledRules.missing_after_start) {
+      summaries.push(`Show missing participants after ${missingAfterMinutes || "0"} minutes`);
+    }
+
+    if (enabledRules.capacity_warning) {
+      summaries.push(`Warn host at ${capacityWarningCount || "0"} present participants`);
+    }
+
+    return summaries;
+  }, [attendanceRadiusMeters, capacityWarningCount, enabledRules, minimumPresentCount, missingAfterMinutes]);
 
   function updateAttendanceRadius(value: number) {
     const nextRadius = clampRadius(value);
@@ -72,14 +147,58 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
     updateAttendanceRadius(Number.isFinite(parsed) ? parsed : attendanceRadiusMeters);
   }
 
+  function updateNumericInput(value: string, setter: (nextValue: string) => void) {
+    setter(value.replace(/[^0-9]/g, "").slice(0, 4));
+  }
+
+  function toggleRule(ruleId: BehaviorRuleId) {
+    setEnabledRules((prev) => ({
+      ...prev,
+      [ruleId]: !prev[ruleId],
+    }));
+  }
+
+  function buildTriggerRows(): EventTriggerInput[] {
+    return behaviorRules
+      .filter((rule) => enabledRules[rule.id])
+      .map((rule) => {
+        if (rule.id === "minimum_present") {
+          return { type: rule.id, config: { count: Number(minimumPresentCount) || 0 } };
+        }
+
+        if (rule.id === "missing_after_start") {
+          return { type: rule.id, config: { minutesAfterStart: Number(missingAfterMinutes) || 0 } };
+        }
+
+        if (rule.id === "capacity_warning") {
+          return { type: rule.id, config: { presentCount: Number(capacityWarningCount) || 0 } };
+        }
+
+        return { type: rule.id, config: { radiusMeters: attendanceRadiusMeters } };
+      });
+  }
+
   async function handleCreateEvent() {
     setCreateEventError(null);
     setCreateEventSuccess(null);
 
-    if (selectedMethod === "ble_beacon") {
-      const message = "Bluetooth beacon attendance is not implemented yet. Please choose GPS geofence for now.";
-      setCreateEventError(message);
-      Alert.alert("Not implemented yet", message);
+    if (enabledRuleCount === 0) {
+      setCreateEventError("Select at least one event behavior rule.");
+      return;
+    }
+
+    if (enabledRules.minimum_present && (Number(minimumPresentCount) || 0) < 1) {
+      setCreateEventError("Minimum participant count must be at least 1.");
+      return;
+    }
+
+    if (enabledRules.missing_after_start && (Number(missingAfterMinutes) || 0) < 1) {
+      setCreateEventError("Missing participant delay must be at least 1 minute.");
+      return;
+    }
+
+    if (enabledRules.capacity_warning && (Number(capacityWarningCount) || 0) < 1) {
+      setCreateEventError("Capacity warning count must be at least 1.");
       return;
     }
 
@@ -171,10 +290,19 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
       }
     }
 
-    console.log("[Attendance setup selected]", {
+    const triggerRows = buildTriggerRows();
+    const { error: triggerError } = await saveEventBehaviorTriggers(createdEvent.id, triggerRows);
+    if (triggerError) {
+      setCreateEventError(triggerError);
+      setCreatingEvent(false);
+      return;
+    }
+
+    console.log("[Event behavior selected]", {
       eventId: createdEvent.id,
-      attendanceCountingEnabled: true,
-      attendanceMethod: selectedMethod,
+      presenceDetectionEnabled: true,
+      presenceDetectionMethod: selectedMethod,
+      behaviorTriggers: triggerRows,
     });
 
     setCreateEventSuccess("Event created successfully.");
@@ -199,19 +327,19 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
-        <StepIndicator step={4} total={4} label="Attendance" />
+        <StepIndicator step={4} total={4} label="Behavior" />
 
         <View style={styles.heroCard}>
-          <Text style={styles.title}>Choose how attendance should be counted</Text>
+          <Text style={styles.title}>Configure event behavior</Text>
           <Text style={styles.heroText}>
-            GPS attendance can count people automatically. Bluetooth beacon attendance is kept as an option, but is not implemented yet.
+            Choose how this event should react to presence, participant counts, and missing participants.
           </Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Counting method</Text>
+          <Text style={styles.cardTitle}>Presence detection</Text>
           <View style={styles.optionList}>
-            {attendanceOptions.map((option) => {
+            {presenceOptions.map((option) => {
               const isSelected = option.method === selectedMethod;
               return (
                 <Pressable
@@ -243,8 +371,8 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
 
         {selectedMethod === "gps_geofence" ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Geofence radius</Text>
-            <Text style={styles.cardText}>People inside this distance from the event location can be counted automatically.</Text>
+            <Text style={styles.cardTitle}>Event area</Text>
+            <Text style={styles.cardText}>Presence rules use this radius around the selected event location.</Text>
             <View style={styles.radiusHeader}>
               <Text style={styles.radiusValue}>{attendanceRadiusMeters} m</Text>
               <View style={styles.radiusInputWrap}>
@@ -279,10 +407,95 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
         ) : null}
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Selected setup</Text>
-          <Text style={styles.cardText}>{selectedOption.title}</Text>
-          <Text style={styles.cardText}>{selectedOption.description}</Text>
-          {selectedMethod === "gps_geofence" ? <Text style={styles.cardText}>Radius: {attendanceRadiusMeters} m</Text> : null}
+          <View style={styles.ruleHeader}>
+            <Text style={styles.cardTitleNoMargin}>Trigger rules</Text>
+            <Text style={styles.ruleCounter}>{enabledRuleCount} selected</Text>
+          </View>
+
+          <View style={styles.optionList}>
+            {behaviorRules.map((rule) => {
+              const isSelected = enabledRules[rule.id];
+              return (
+                <Pressable
+                  key={rule.id}
+                  onPress={() => toggleRule(rule.id)}
+                  style={({ pressed }) => [
+                    styles.ruleCard,
+                    isSelected && styles.ruleCardActive,
+                    pressed && styles.methodCardPressed,
+                  ]}
+                >
+                  <View style={styles.ruleTitleRow}>
+                    <View style={[styles.checkbox, isSelected && styles.checkboxActive]}>
+                      {isSelected ? <View style={styles.checkboxFill} /> : null}
+                    </View>
+                    <View style={styles.methodTextWrap}>
+                      <Text style={[styles.ruleTitle, isSelected && styles.methodTitleActive]}>{rule.title}</Text>
+                      <Text style={[styles.ruleDescription, isSelected && styles.methodDescriptionActive]}>{rule.description}</Text>
+                    </View>
+                  </View>
+
+                  {rule.id === "minimum_present" && isSelected ? (
+                    <View style={styles.inlineInputRow}>
+                      <Text style={styles.inlineInputLabel}>Required present</Text>
+                      <View style={styles.compactInputWrap}>
+                        <TextInput
+                          value={minimumPresentCount}
+                          onChangeText={(value) => updateNumericInput(value, setMinimumPresentCount)}
+                          keyboardType="number-pad"
+                          maxLength={4}
+                          style={styles.compactInput}
+                        />
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {rule.id === "missing_after_start" && isSelected ? (
+                    <View style={styles.inlineInputRow}>
+                      <Text style={styles.inlineInputLabel}>After start</Text>
+                      <View style={styles.compactInputWrap}>
+                        <TextInput
+                          value={missingAfterMinutes}
+                          onChangeText={(value) => updateNumericInput(value, setMissingAfterMinutes)}
+                          keyboardType="number-pad"
+                          maxLength={4}
+                          style={styles.compactInput}
+                        />
+                        <Text style={styles.compactInputUnit}>min</Text>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {rule.id === "capacity_warning" && isSelected ? (
+                    <View style={styles.inlineInputRow}>
+                      <Text style={styles.inlineInputLabel}>Warn at</Text>
+                      <View style={styles.compactInputWrap}>
+                        <TextInput
+                          value={capacityWarningCount}
+                          onChangeText={(value) => updateNumericInput(value, setCapacityWarningCount)}
+                          keyboardType="number-pad"
+                          maxLength={4}
+                          style={styles.compactInput}
+                        />
+                        <Text style={styles.compactInputUnit}>present</Text>
+                      </View>
+                    </View>
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Behavior summary</Text>
+          <Text style={styles.cardText}>{selectedPresenceOption.title}</Text>
+          {selectedRuleSummaries.map((summary) => (
+            <View key={summary} style={styles.summaryRow}>
+              <View style={styles.summaryDot} />
+              <Text style={styles.summaryText}>{summary}</Text>
+            </View>
+          ))}
         </View>
 
         {createEventError ? <Text style={styles.errorText}>{createEventError}</Text> : null}
@@ -335,6 +548,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   cardTitle: { fontSize: 18, fontWeight: "700", marginBottom: 10, color: "#201c19" },
+  cardTitleNoMargin: { fontSize: 18, fontWeight: "700", color: "#201c19" },
   cardText: { fontSize: 14, color: "#5f5145", marginBottom: 6, lineHeight: 20 },
   optionList: { gap: 10 },
   methodCard: {
@@ -427,6 +641,123 @@ const styles = StyleSheet.create({
     color: "#8a7f74",
     fontSize: 12,
     fontWeight: "700",
+  },
+  ruleHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 10,
+  },
+  ruleCounter: {
+    color: "#2f5d50",
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  ruleCard: {
+    borderWidth: 1,
+    borderColor: "#eadfce",
+    borderRadius: 18,
+    backgroundColor: "#fff6ea",
+    padding: 14,
+  },
+  ruleCardActive: {
+    borderColor: "#2f5d50",
+    backgroundColor: "#edf4ee",
+  },
+  ruleTitleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: "#b9a894",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  checkboxActive: {
+    borderColor: "#2f5d50",
+    backgroundColor: "#dfece2",
+  },
+  checkboxFill: {
+    width: 10,
+    height: 10,
+    borderRadius: 3,
+    backgroundColor: "#2f5d50",
+  },
+  ruleTitle: {
+    color: "#201c19",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  ruleDescription: {
+    color: "#5f5145",
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 3,
+  },
+  inlineInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#dbe7dc",
+  },
+  inlineInputLabel: {
+    color: "#36574b",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  compactInputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#c9dacd",
+    borderRadius: 14,
+    backgroundColor: "#fffaf4",
+    paddingHorizontal: 10,
+  },
+  compactInput: {
+    minWidth: 42,
+    paddingVertical: 7,
+    color: "#201c19",
+    fontSize: 15,
+    fontWeight: "800",
+    textAlign: "right",
+  },
+  compactInputUnit: {
+    color: "#6f6258",
+    fontSize: 12,
+    fontWeight: "800",
+    marginLeft: 4,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginTop: 6,
+  },
+  summaryDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "#2f5d50",
+    marginTop: 7,
+  },
+  summaryText: {
+    flex: 1,
+    color: "#5f5145",
+    fontSize: 14,
+    lineHeight: 20,
   },
   primaryBtn: {
     marginTop: 6,

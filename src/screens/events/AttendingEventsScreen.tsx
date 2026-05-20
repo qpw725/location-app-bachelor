@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ScrollView, View, Text, StyleSheet, ActivityIndicator, RefreshControl } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { EventSummaryCard } from "../../components/EventListViews";
+import { fetchEventRuntimeStatus, type EventRuntimeStatus } from "../../data/eventRules";
 import { fetchEventBuckets, type EventItem } from "../../data/eventStore";
 import type { RootStackParamList } from "../../../App";
 
@@ -12,8 +13,10 @@ export default function AttendingEventsScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [eventStatuses, setEventStatuses] = useState<Record<string, EventRuntimeStatus>>({});
   const loadEvents = useCallback(async () => {
     setError(null);
+    setEventStatuses({});
     const { data, error: fetchError } = await fetchEventBuckets();
     if (fetchError || !data) {
       setError(fetchError ?? "Could not load attending events.");
@@ -22,6 +25,17 @@ export default function AttendingEventsScreen({ navigation }: Props) {
     }
     setEvents(data.attendingEvents);
     setLoading(false);
+
+    const statusPairs = await Promise.all(
+      data.attendingEvents
+        .filter((event) => event.attendanceEnabled)
+        .map(async (event) => {
+          const { data: status } = await fetchEventRuntimeStatus({ event, viewerRole: "attending" });
+          return status ? ([event.id, status] as const) : null;
+        })
+    );
+
+    setEventStatuses(Object.fromEntries(statusPairs.filter((pair): pair is readonly [string, EventRuntimeStatus] => pair !== null)));
   }, []);
 
   useEffect(() => {
@@ -66,6 +80,7 @@ export default function AttendingEventsScreen({ navigation }: Props) {
         <EventSummaryCard
           key={event.id}
           event={event}
+          runtimeStatus={eventStatuses[event.id] ?? null}
           onPress={() => navigation.navigate("EventDetails", { eventId: event.id, source: "attending" })}
         />
       ))}

@@ -25,6 +25,7 @@ import LiveEventMapScreen from "./src/screens/events/LiveEventMapScreen";
 import LoginScreen from "./src/screens/auth/LoginScreen";
 import RegisterScreen from "./src/screens/auth/RegisterScreen";
 import RegisterProfileScreen from "./src/screens/auth/RegisterProfileScreen";
+import { startOpenAppEventPresenceTracking, stopOpenAppEventPresenceTracking } from "./src/eventPresenceManager";
 import { initializeEventLocationSharing } from "./src/locationSharingManager";
 import { supabase } from "./src/supabase";
 
@@ -46,7 +47,7 @@ export type EventDate = {
   day: number;
 };
 
-export type EventAttendanceMethod = "gps_geofence" | "ble_beacon";
+export type EventAttendanceMethod = "gps_geofence";
 
 export type EventInvitee = {
   id: string;
@@ -189,10 +190,16 @@ export default function App() {
 
   useEffect(() => {
     if (!session) {
+      stopOpenAppEventPresenceTracking();
       return;
     }
 
     void initializeEventLocationSharing();
+    void startOpenAppEventPresenceTracking();
+
+    return () => {
+      stopOpenAppEventPresenceTracking();
+    };
   }, [session]);
 
   useEffect(() => {
@@ -294,7 +301,7 @@ export default function App() {
           <Stack.Screen
             name="CreateEventAttendance"
             component={CreateEventAttendanceScreen}
-            options={{ title: "Attendance", headerBackTitle: "Event" }}
+            options={{ title: "Behavior", headerBackTitle: "Event" }}
           />
           <Stack.Screen
             name="LiveEventMap"
