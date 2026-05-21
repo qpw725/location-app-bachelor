@@ -4,10 +4,14 @@ import type { EventItem } from "./eventStore";
 
 export type EventTriggerType =
   | "participant_enters_area"
+  | "participant_leaves_area"
   | "host_enters_area"
+  | "host_leaves_area"
   | "minimum_present"
   | "missing_after_start"
-  | "capacity_warning";
+  | "capacity_warning"
+  | "scheduled_start"
+  | "scheduled_end";
 
 export type EventTriggerInput = {
   type: EventTriggerType;
@@ -61,6 +65,8 @@ export type EventPresencePerson = {
 
 export type EventRuntimeStatusId =
   | "hidden"
+  | "scheduled"
+  | "pre_event"
   | "not_started"
   | "host_not_arrived"
   | "host_left"
@@ -68,7 +74,8 @@ export type EventRuntimeStatusId =
   | "event_full"
   | "ready"
   | "active"
-  | "ended";
+  | "ended"
+  | "cancelled";
 
 export type EventRuntimeSeverity = "neutral" | "warning" | "success" | "danger";
 
@@ -106,7 +113,7 @@ export async function saveEventBehaviorTriggers(eventId: string, triggers: Event
     config: trigger.config,
   }));
 
-  const { error } = await supabase.from("event_triggers").insert(rows);
+  const { error } = await supabase.from("event_triggers").upsert(rows, { onConflict: "event_id,type" });
 
   if (isMissingTriggerTableError(error)) {
     console.warn("[EventRules] event_triggers table is missing. Trigger settings were not saved.");
@@ -184,7 +191,7 @@ export async function endHostedEventNow(eventId: string): Promise<{ error: strin
   const nowIso = new Date().toISOString();
   const { error } = await supabase
     .from("events")
-    .update({ end_time: nowIso })
+    .update({ status: "ended", ended_at: nowIso, ended_reason: "host_left_area" })
     .eq("id", eventId)
     .eq("creator_id", user.id);
 
@@ -329,9 +336,17 @@ function deriveRuntimeStatus(input: {
   const now = Date.now();
   const startMs = event.startAt?.getTime() ?? NaN;
   const endMs = event.endAt?.getTime() ?? NaN;
-  const statusOpenMs = Number.isFinite(startMs) ? startMs - STATUS_LEAD_MINUTES * 60 * 1000 : NaN;
+  const endedMs = event.endedAt?.getTime() ?? NaN;
+  const leadMinutes = event.preEventWindowMinutes ?? STATUS_LEAD_MINUTES;
+  const statusOpenMs = Number.isFinite(startMs) ? startMs - leadMinutes * 60 * 1000 : NaN;
   const isHostViewer = viewerRole === "hosting";
-  const canShowLiveState = isHostViewer || !Number.isFinite(statusOpenMs) || now >= statusOpenMs;
+  const canShowLiveState =
+    isHostViewer ||
+    event.status === "pre_event" ||
+    event.status === "ready" ||
+    event.status === "active" ||
+    !Number.isFinite(statusOpenMs) ||
+    now >= statusOpenMs;
 
   const acceptedParticipants = people.filter((person) => !person.isHost);
   const presentCount = acceptedParticipants.filter((person) => person.isPresent).length;
@@ -339,11 +354,12 @@ function deriveRuntimeStatus(input: {
   const host = people.find((person) => person.isHost);
   const viewerPresence = viewerId ? people.find((person) => person.id === viewerId) ?? null : null;
   const hostPresent = Boolean(host?.isPresent);
+  const isManuallyActivated = event.status === "active";
   const hostRule = getHostPresenceRule(triggers);
   const hostRequired = hostRule.requireHostPresence;
   const hostLeavesEndsEvent = hostRule.endWhenHostLeaves;
   const hostHasLeftAfterArriving = Boolean(host?.hasCheckedIn && !hostPresent);
-  const canEndFromHostLeaving = !Number.isFinite(startMs) || now >= startMs;
+  const canEndFromHostLeaving = isManuallyActivated || !Number.isFinite(startMs) || now >= startMs;
   const missingTriggerEnabled = hasTrigger(triggers, "missing_after_start");
   const minimumPresentCount = getMinimumPresentCount(triggers);
   const capacityLimit = getCapacityLimit(triggers);
@@ -359,13 +375,71 @@ function deriveRuntimeStatus(input: {
   const leftParticipants = acceptedParticipants.filter((person) => person.presenceState === "left" || person.presenceState === "stale");
   const createRuntimeStatus = (status: Omit<EventRuntimeStatus, "participants">) =>
     createStatus(status, acceptedParticipants);
+  const isBeforeStart = Number.isFinite(startMs) && now < startMs;
+  const isInPreEventWindow = Number.isFinite(statusOpenMs) && now >= statusOpenMs && isBeforeStart;
+  const canAutoStartBeforeScheduledTime = event.startMode === "auto_on_ready";
+  const isManualStartRequired = event.startMode === "manual" && !isManuallyActivated;
+
+  if (event.status === "cancelled") {
+    return createRuntimeStatus({
+      status: "cancelled",
+      severity: "neutral",
+      title: "Event cancelled",
+      message: "This event has been cancelled.",
+      canShowLiveState,
+      presentCount,
+      acceptedCount,
+      missingParticipants,
+      leftParticipants,
+      viewerPresence,
+      hostPresent,
+      minimumPresentCount,
+      capacityLimit,
+    });
+  }
+
+  if (event.status === "ended" || (Number.isFinite(endedMs) && now >= endedMs)) {
+    return createRuntimeStatus({
+      status: "ended",
+      severity: "neutral",
+      title: "Event ended",
+      message: `${presentCount} participant${presentCount === 1 ? "" : "s"} were marked present.`,
+      canShowLiveState,
+      presentCount,
+      acceptedCount,
+      missingParticipants,
+      leftParticipants,
+      viewerPresence,
+      hostPresent,
+      minimumPresentCount,
+      capacityLimit,
+    });
+  }
 
   if (!canShowLiveState) {
     return createRuntimeStatus({
       status: "hidden",
       severity: "neutral",
       title: "Status updates not open yet",
-      message: `Live event behavior appears ${STATUS_LEAD_MINUTES} minutes before the event starts.`,
+      message: `Live event behavior appears ${leadMinutes} minutes before the event starts.`,
+      canShowLiveState,
+      presentCount,
+      acceptedCount,
+      missingParticipants: [],
+      leftParticipants: [],
+      viewerPresence,
+      hostPresent,
+      minimumPresentCount,
+      capacityLimit,
+    });
+  }
+
+  if (!isInPreEventWindow && isHostViewer && Number.isFinite(statusOpenMs) && now < statusOpenMs) {
+    return createRuntimeStatus({
+      status: "scheduled",
+      severity: "neutral",
+      title: "Event scheduled",
+      message: `Live event behavior opens ${leadMinutes} minutes before the event starts.`,
       canShowLiveState,
       presentCount,
       acceptedCount,
@@ -488,11 +562,53 @@ function deriveRuntimeStatus(input: {
   }
 
   if (Number.isFinite(startMs) && now < startMs) {
+    if (minimumPresentCount && presentCount >= minimumPresentCount) {
+      return createRuntimeStatus({
+        status: canAutoStartBeforeScheduledTime || isManuallyActivated ? "active" : "ready",
+        severity: "success",
+        title: canAutoStartBeforeScheduledTime || isManuallyActivated ? "Event active" : "Event ready",
+        message: canAutoStartBeforeScheduledTime || isManuallyActivated
+          ? `${presentCount} participants are present, so the event has started before the scheduled time.`
+          : `${presentCount} participants are present, so the event is ready before the scheduled start time.`,
+        canShowLiveState,
+        presentCount,
+        acceptedCount,
+        missingParticipants,
+        leftParticipants,
+        viewerPresence,
+        hostPresent,
+        minimumPresentCount,
+        capacityLimit,
+      });
+    }
+
+    if (hostRequired && hostPresent) {
+      return createRuntimeStatus({
+        status: canAutoStartBeforeScheduledTime || isManuallyActivated ? "active" : "ready",
+        severity: "success",
+        title: canAutoStartBeforeScheduledTime || isManuallyActivated ? "Event active" : "Event ready",
+        message: canAutoStartBeforeScheduledTime || isManuallyActivated
+          ? "The host is present, so the event has started before the scheduled time."
+          : "The host is present, so the event is ready before the scheduled start time.",
+        canShowLiveState,
+        presentCount,
+        acceptedCount,
+        missingParticipants,
+        leftParticipants,
+        viewerPresence,
+        hostPresent,
+        minimumPresentCount,
+        capacityLimit,
+      });
+    }
+
     return createRuntimeStatus({
-      status: "not_started",
+      status: isInPreEventWindow ? "pre_event" : "not_started",
       severity: "neutral",
-      title: "Not started yet",
-      message: "Presence tracking is available, but the scheduled start time has not passed.",
+      title: isInPreEventWindow ? "Pre-event window" : "Not started yet",
+      message: isInPreEventWindow
+        ? "Presence tracking is available before the scheduled start time."
+        : "Presence tracking is available, but the scheduled start time has not passed.",
       canShowLiveState,
       presentCount,
       acceptedCount,
@@ -507,10 +623,30 @@ function deriveRuntimeStatus(input: {
 
   if (minimumPresentCount && presentCount >= minimumPresentCount) {
     return createRuntimeStatus({
+      status: isManualStartRequired ? "ready" : "active",
+      severity: "success",
+      title: isManualStartRequired ? "Event ready" : "Event active",
+      message: isManualStartRequired
+        ? `${presentCount} participants are present, so the event is ready for the host to start.`
+        : `${presentCount} participants are present, so the event is active.`,
+      canShowLiveState,
+      presentCount,
+      acceptedCount,
+      missingParticipants,
+      leftParticipants,
+      viewerPresence,
+      hostPresent,
+      minimumPresentCount,
+      capacityLimit,
+    });
+  }
+
+  if (isManualStartRequired) {
+    return createRuntimeStatus({
       status: "ready",
       severity: "success",
       title: "Event ready",
-      message: `${presentCount} participants are present, so the ready condition is met.`,
+      message: "The configured conditions are met, and the host can start the event.",
       canShowLiveState,
       presentCount,
       acceptedCount,

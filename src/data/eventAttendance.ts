@@ -28,13 +28,20 @@ export function isEventOngoing(event: Pick<EventItem, "startAt" | "endAt">) {
   return now >= event.startAt.getTime() && now <= event.endAt.getTime();
 }
 
-export function isEventPresenceWindowOpen(event: Pick<EventItem, "startAt" | "endAt">, leadMinutes = 60) {
+export function isEventPresenceWindowOpen(
+  event: Pick<EventItem, "startAt" | "endAt"> & { preEventWindowMinutes?: number | null },
+  leadMinutes = 60
+) {
   if (!event.startAt || !event.endAt) {
     return false;
   }
 
+  const windowMinutes =
+    typeof event.preEventWindowMinutes === "number" && event.preEventWindowMinutes >= 0
+      ? event.preEventWindowMinutes
+      : leadMinutes;
   const now = Date.now();
-  return now >= event.startAt.getTime() - leadMinutes * 60 * 1000 && now <= event.endAt.getTime();
+  return now >= event.startAt.getTime() - windowMinutes * 60 * 1000 && now <= event.endAt.getTime();
 }
 
 export function canUseGpsAttendance(event: EventItem) {

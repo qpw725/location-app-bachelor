@@ -65,6 +65,8 @@ function getRuntimeStatusLabel(status: EventRuntimeStatus | null | undefined) {
   }
 
   if (status.status === "hidden") return "Updates near start";
+  if (status.status === "scheduled") return "Scheduled";
+  if (status.status === "pre_event") return "Pre-event";
   if (status.status === "not_started") return "Not started";
   if (status.status === "host_not_arrived") return "Host not arrived";
   if (status.status === "host_left") return "Host left";
@@ -73,6 +75,7 @@ function getRuntimeStatusLabel(status: EventRuntimeStatus | null | undefined) {
   if (status.status === "ready") return "Ready";
   if (status.status === "active") return "Active";
   if (status.status === "ended") return "Ended";
+  if (status.status === "cancelled") return "Cancelled";
 
   return "Event status";
 }

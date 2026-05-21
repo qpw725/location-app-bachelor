@@ -96,7 +96,7 @@ export default function LiveEventMapScreen({ route }: Props) {
     const startResult = await startEventLocationSharing({
       eventId,
       startAt: eventDetails.startAt,
-      endAt: eventDetails.endAt,
+      endAt: eventDetails.endedAt ?? eventDetails.endAt,
     });
 
     if (startResult.error) {
@@ -141,7 +141,7 @@ export default function LiveEventMapScreen({ route }: Props) {
       return;
     }
 
-    const endTime = eventDetails.endAt?.getTime() ?? eventDetails.startAt?.getTime() ?? 0;
+    const endTime = eventDetails.endedAt?.getTime() ?? eventDetails.endAt?.getTime() ?? eventDetails.startAt?.getTime() ?? 0;
     if (endTime > 0 && endTime < Date.now()) {
       void handleStopSharing();
     }

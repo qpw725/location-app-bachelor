@@ -10,6 +10,9 @@ type EventMapRow = {
   start_time: string | null;
   end_time: string | null;
   creator_id: string | null;
+  pre_event_window_minutes: number | null;
+  status: string | null;
+  ended_at: string | null;
 };
 
 type ProfileRow = {
@@ -35,6 +38,9 @@ export type EventMapDetails = {
   eventLongitude: number | null;
   startAt: Date | null;
   endAt: Date | null;
+  endedAt: Date | null;
+  status: "scheduled" | "pre_event" | "ready" | "active" | "ended" | "cancelled";
+  preEventWindowMinutes: number;
   canViewMap: boolean;
   isSharingActive: boolean;
 };
@@ -73,15 +79,32 @@ function initialsFromProfile(profile: ProfileRow | undefined) {
   return initials || profile?.username?.trim().charAt(0).toUpperCase() || "?";
 }
 
-export function isEventShareWindowOpen(event: { startAt: Date | null; endAt: Date | null }, leadMinutes = 60) {
+export function isEventShareWindowOpen(
+  event: {
+    startAt: Date | null;
+    endAt: Date | null;
+    endedAt?: Date | null;
+    status?: EventMapDetails["status"];
+    preEventWindowMinutes?: number | null;
+  },
+  leadMinutes = 60
+) {
+  if (event.status === "ended" || event.status === "cancelled") {
+    return false;
+  }
+
   if (!event.startAt) {
     return false;
   }
 
+  const windowMinutes =
+    typeof event.preEventWindowMinutes === "number" && event.preEventWindowMinutes >= 0
+      ? event.preEventWindowMinutes
+      : leadMinutes;
   const now = Date.now();
   const startMs = event.startAt.getTime();
-  const endMs = event.endAt?.getTime() ?? startMs;
-  return now >= startMs - leadMinutes * 60 * 1000 && now <= endMs;
+  const endMs = event.endedAt?.getTime() ?? event.endAt?.getTime() ?? startMs;
+  return now >= startMs - windowMinutes * 60 * 1000 && now <= endMs;
 }
 
 export function hasEventMapCoordinates(event: { eventLatitude: number | null; eventLongitude: number | null }) {
@@ -104,7 +127,7 @@ export async function fetchEventMapDetails(eventId: string): Promise<{ data: Eve
 
   const { data: event, error: eventError } = await supabase
     .from("events")
-    .select("id, title, location, latitude, longitude, start_time, end_time, creator_id")
+    .select("id, title, location, latitude, longitude, start_time, end_time, creator_id, pre_event_window_minutes, status, ended_at")
     .eq("id", eventId)
     .maybeSingle<EventMapRow>();
 
@@ -153,11 +176,32 @@ export async function fetchEventMapDetails(eventId: string): Promise<{ data: Eve
       eventLongitude: event.longitude,
       startAt: event.start_time ? new Date(event.start_time) : null,
       endAt: event.end_time ? new Date(event.end_time) : null,
+      endedAt: event.ended_at ? new Date(event.ended_at) : null,
+      status: normalizeEventStatus(event.status),
+      preEventWindowMinutes:
+        typeof event.pre_event_window_minutes === "number" && event.pre_event_window_minutes >= 0
+          ? event.pre_event_window_minutes
+          : 60,
       canViewMap,
       isSharingActive: Boolean(myLiveLocation?.user_id),
     },
     error: null,
   };
+}
+
+function normalizeEventStatus(value: string | null): EventMapDetails["status"] {
+  if (
+    value === "scheduled" ||
+    value === "pre_event" ||
+    value === "ready" ||
+    value === "active" ||
+    value === "ended" ||
+    value === "cancelled"
+  ) {
+    return value;
+  }
+
+  return "scheduled";
 }
 
 export async function fetchEventLiveParticipants(eventId: string): Promise<{ data: LiveEventParticipant[] | null; error: string | null }> {

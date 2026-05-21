@@ -267,6 +267,12 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
         attendance_enabled: true,
         attendance_method: selectedMethod,
         attendance_radius_meters: selectedMethod === "gps_geofence" ? attendanceRadiusMeters : null,
+        status: "scheduled",
+        started_at: null,
+        ended_at: null,
+        ended_reason: null,
+        pre_event_window_minutes: 60,
+        start_mode: "scheduled",
       })
       .select("id")
       .single();

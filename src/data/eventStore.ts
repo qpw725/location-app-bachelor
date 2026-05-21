@@ -18,6 +18,12 @@ type DbEventRow = {
   attendance_enabled: boolean | null;
   attendance_method: string | null;
   attendance_radius_meters: number | null;
+  status: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  ended_reason: string | null;
+  pre_event_window_minutes: number | null;
+  start_mode: string | null;
 };
 
 type ProfileRow = {
@@ -57,6 +63,12 @@ export type EventItem = {
   attendanceEnabled: boolean;
   attendanceMethod: string | null;
   attendanceRadiusMeters: number | null;
+  status: "scheduled" | "pre_event" | "ready" | "active" | "ended" | "cancelled";
+  startedAt: Date | null;
+  endedAt: Date | null;
+  endedReason: string | null;
+  preEventWindowMinutes: number;
+  startMode: "scheduled" | "manual" | "auto_on_ready";
 };
 
 export type EventBuckets = {
@@ -132,6 +144,9 @@ function formatEventTime(startIso: string | null, endIso: string | null) {
 }
 
 function mapEventRow(row: DbEventRow, creatorProfile: ProfileRow | undefined, activeUserId: string | null): EventItem {
+  const status = normalizeEventStatus(row.status);
+  const startMode = normalizeStartMode(row.start_mode);
+
   return {
     id: row.id,
     title: row.title?.trim() || "Untitled event",
@@ -149,12 +164,48 @@ function mapEventRow(row: DbEventRow, creatorProfile: ProfileRow | undefined, ac
     attendanceEnabled: Boolean(row.attendance_enabled),
     attendanceMethod: row.attendance_method?.trim() || null,
     attendanceRadiusMeters: row.attendance_radius_meters,
+    status,
+    startedAt: row.started_at ? new Date(row.started_at) : null,
+    endedAt: row.ended_at ? new Date(row.ended_at) : null,
+    endedReason: row.ended_reason?.trim() || null,
+    preEventWindowMinutes:
+      typeof row.pre_event_window_minutes === "number" && row.pre_event_window_minutes >= 0
+        ? row.pre_event_window_minutes
+        : 60,
+    startMode,
   };
 }
 
 function isPastEvent(event: EventItem, now: number) {
-  const endTime = event.endAt?.getTime() ?? event.startAt?.getTime();
+  if (event.status === "ended" || event.status === "cancelled") {
+    return true;
+  }
+
+  const endTime = event.endedAt?.getTime() ?? event.endAt?.getTime() ?? event.startAt?.getTime();
   return typeof endTime === "number" && endTime < now;
+}
+
+function normalizeEventStatus(value: string | null): EventItem["status"] {
+  if (
+    value === "scheduled" ||
+    value === "pre_event" ||
+    value === "ready" ||
+    value === "active" ||
+    value === "ended" ||
+    value === "cancelled"
+  ) {
+    return value;
+  }
+
+  return "scheduled";
+}
+
+function normalizeStartMode(value: string | null): EventItem["startMode"] {
+  if (value === "manual" || value === "auto_on_ready") {
+    return value;
+  }
+
+  return "scheduled";
 }
 
 function sortAscending(events: EventItem[]) {
@@ -173,7 +224,7 @@ export async function fetchEventBuckets(): Promise<{ data: EventBuckets | null; 
 
   const userId = authData.user?.id ?? null;
   const eventSelect =
-    "id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id, attendance_enabled, attendance_method, attendance_radius_meters";
+    "id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id, attendance_enabled, attendance_method, attendance_radius_meters, status, started_at, ended_at, ended_reason, pre_event_window_minutes, start_mode";
 
   const { data: publicRows, error: publicError } = await supabase
     .from("events")
@@ -304,7 +355,7 @@ export async function joinPublicEvent(eventId: string): Promise<{ error: string 
 
   const { data: event, error: eventError } = await supabase
     .from("events")
-    .select("id, private, creator_id, start_time, end_time")
+    .select("id, private, creator_id, start_time, end_time, status, ended_at")
     .eq("id", eventId)
     .maybeSingle();
 
@@ -324,7 +375,21 @@ export async function joinPublicEvent(eventId: string): Promise<{ error: string 
     return { error: "This event is private and cannot be joined without an invite." };
   }
 
-  const eventEndTime = event.end_time ? new Date(event.end_time).getTime() : event.start_time ? new Date(event.start_time).getTime() : NaN;
+  const eventEndTime = event.ended_at
+    ? new Date(event.ended_at).getTime()
+    : event.end_time
+      ? new Date(event.end_time).getTime()
+      : event.start_time
+        ? new Date(event.start_time).getTime()
+        : NaN;
+  if (event.status === "cancelled") {
+    return { error: "This event has been cancelled." };
+  }
+
+  if (event.status === "ended") {
+    return { error: "This event has already ended." };
+  }
+
   if (!Number.isNaN(eventEndTime) && eventEndTime < Date.now()) {
     return { error: "This event has already ended." };
   }
@@ -372,7 +437,7 @@ export async function fetchHomeOverview(): Promise<{ data: HomeOverview | null; 
 
   const { data: hostingRows, error: hostingError } = await supabase
     .from("events")
-    .select("id, start_time, end_time")
+    .select("id, start_time, end_time, status, ended_at")
     .eq("creator_id", userId);
 
   if (hostingError) {
@@ -381,8 +446,18 @@ export async function fetchHomeOverview(): Promise<{ data: HomeOverview | null; 
 
   const now = Date.now();
   const hostingEventIds = new Set<string>();
-  for (const row of (hostingRows ?? []) as Array<{ id: string; start_time: string | null; end_time: string | null }>) {
-    const endTime = row.end_time ? new Date(row.end_time).getTime() : row.start_time ? new Date(row.start_time).getTime() : NaN;
+  for (const row of (hostingRows ?? []) as Array<{ id: string; start_time: string | null; end_time: string | null; status: string | null; ended_at: string | null }>) {
+    if (row.status === "ended" || row.status === "cancelled") {
+      continue;
+    }
+
+    const endTime = row.ended_at
+      ? new Date(row.ended_at).getTime()
+      : row.end_time
+        ? new Date(row.end_time).getTime()
+        : row.start_time
+          ? new Date(row.start_time).getTime()
+          : NaN;
     if (!Number.isNaN(endTime) && endTime >= now) {
       hostingEventIds.add(row.id);
     }
@@ -419,15 +494,25 @@ export async function fetchHomeOverview(): Promise<{ data: HomeOverview | null; 
   if (involvedIds.length > 0) {
     const { data: invitedEventRows, error: invitedEventsError } = await supabase
       .from("events")
-      .select("id, start_time, end_time")
+      .select("id, start_time, end_time, status, ended_at")
       .in("id", involvedIds);
 
     if (invitedEventsError) {
       return { data: null, error: invitedEventsError.message };
     }
 
-    for (const row of (invitedEventRows ?? []) as Array<{ id: string; start_time: string | null; end_time: string | null }>) {
-      const endTime = row.end_time ? new Date(row.end_time).getTime() : row.start_time ? new Date(row.start_time).getTime() : NaN;
+    for (const row of (invitedEventRows ?? []) as Array<{ id: string; start_time: string | null; end_time: string | null; status: string | null; ended_at: string | null }>) {
+      if (row.status === "ended" || row.status === "cancelled") {
+        continue;
+      }
+
+      const endTime = row.ended_at
+        ? new Date(row.ended_at).getTime()
+        : row.end_time
+          ? new Date(row.end_time).getTime()
+          : row.start_time
+            ? new Date(row.start_time).getTime()
+            : NaN;
       if (Number.isNaN(endTime) || endTime < now) {
         continue;
       }
@@ -674,6 +759,10 @@ export async function updateHostedEvent(input: {
       private: input.isPrivate,
       start_time: input.startAt.toISOString(),
       end_time: input.endAt.toISOString(),
+      status: "scheduled",
+      started_at: null,
+      ended_at: null,
+      ended_reason: null,
     })
     .eq("id", input.eventId)
     .eq("creator_id", userId)
