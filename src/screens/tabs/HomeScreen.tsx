@@ -4,8 +4,8 @@ import { CompositeScreenProps, useFocusEffect } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainTabParamList, RootStackParamList } from "../../../App";
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "../../supabase";
 import { fetchHomeActivity, fetchHomeOverview, type HomeActivityItem } from "../../data/eventStore";
+import { fetchCurrentProfile } from "../../profile";
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, "Home">,
@@ -15,20 +15,19 @@ type Props = CompositeScreenProps<
 
 
 export default function HomeScreen({ navigation }: Props) {
-  const [displayUsername, setDisplayUsername] = useState("No username found");
+  const [displayName, setDisplayName] = useState("there");
   const [upcomingCount, setUpcomingCount] = useState(0);
   const [pendingInviteCount, setPendingInviteCount] = useState(0);
   const [hostingCount, setHostingCount] = useState(0);
   const [activityItems, setActivityItems] = useState<HomeActivityItem[]>([]);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      const user = data.user;
-      const metadata = user?.user_metadata as
-        | { username?: string }
-        | undefined;
+    fetchCurrentProfile().then(({ profile }) => {
+      if (!profile) {
+        return;
+      }
 
-      setDisplayUsername(metadata?.username?.trim() || "No username found");
+      setDisplayName(profile.fullName !== "No name found" ? profile.fullName : profile.username);
     });
   }, []);
 
@@ -67,7 +66,7 @@ export default function HomeScreen({ navigation }: Props) {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
         <Text style={styles.eyebrow}>Home</Text>
-        <Text style={styles.title}>Hi, {displayUsername}</Text>
+        <Text style={styles.title}>Hi, {displayName}</Text>
         <Text style={styles.heroText}>Plan, host, and participate in events.</Text>
         <Pressable
           style={({ pressed }) => [styles.primaryCard, pressed && styles.pressed]}

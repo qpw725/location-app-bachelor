@@ -26,7 +26,6 @@ import LoginScreen from "./src/screens/auth/LoginScreen";
 import RegisterScreen from "./src/screens/auth/RegisterScreen";
 import RegisterProfileScreen from "./src/screens/auth/RegisterProfileScreen";
 import { startOpenAppEventPresenceTracking, stopOpenAppEventPresenceTracking } from "./src/eventPresenceManager";
-import { initializeEventLocationSharing } from "./src/locationSharingManager";
 import { supabase } from "./src/supabase";
 
 
@@ -88,6 +87,7 @@ export type RootStackParamList = {
     visibility: "Private" | "Public";
     selectedCategory: string;
     invitedPeople: EventInvitee[];
+    liveMapEnabled: boolean;
   };
   LiveEventMap: {
     eventId: string;
@@ -194,7 +194,6 @@ export default function App() {
       return;
     }
 
-    void initializeEventLocationSharing();
     void startOpenAppEventPresenceTracking();
 
     return () => {

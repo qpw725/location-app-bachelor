@@ -1,5 +1,4 @@
 import { supabase } from "../supabase";
-import { stopEventLocationSharing } from "../locationSharingManager";
 import { getAvatarPublicUrl } from "../profile";
 import { fetchEventCapacityLimit } from "./eventRules";
 
@@ -18,6 +17,7 @@ type DbEventRow = {
   attendance_enabled: boolean | null;
   attendance_method: string | null;
   attendance_radius_meters: number | null;
+  live_map_enabled: boolean | null;
   status: string | null;
   started_at: string | null;
   ended_at: string | null;
@@ -63,6 +63,7 @@ export type EventItem = {
   attendanceEnabled: boolean;
   attendanceMethod: string | null;
   attendanceRadiusMeters: number | null;
+  liveMapEnabled: boolean;
   status: "scheduled" | "pre_event" | "ready" | "active" | "ended" | "cancelled";
   startedAt: Date | null;
   endedAt: Date | null;
@@ -164,6 +165,7 @@ function mapEventRow(row: DbEventRow, creatorProfile: ProfileRow | undefined, ac
     attendanceEnabled: Boolean(row.attendance_enabled),
     attendanceMethod: row.attendance_method?.trim() || null,
     attendanceRadiusMeters: row.attendance_radius_meters,
+    liveMapEnabled: Boolean(row.live_map_enabled),
     status,
     startedAt: row.started_at ? new Date(row.started_at) : null,
     endedAt: row.ended_at ? new Date(row.ended_at) : null,
@@ -224,7 +226,7 @@ export async function fetchEventBuckets(): Promise<{ data: EventBuckets | null; 
 
   const userId = authData.user?.id ?? null;
   const eventSelect =
-    "id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id, attendance_enabled, attendance_method, attendance_radius_meters, status, started_at, ended_at, ended_reason, pre_event_window_minutes, start_mode";
+    "id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id, attendance_enabled, attendance_method, attendance_radius_meters, live_map_enabled, status, started_at, ended_at, ended_reason, pre_event_window_minutes, start_mode";
 
   const { data: publicRows, error: publicError } = await supabase
     .from("events")
@@ -607,7 +609,7 @@ export async function fetchHomeActivity(): Promise<{ data: HomeActivityItem[] | 
     const { data: eventRows, error: eventRowsError } = await supabase
       .from("events")
       .select(
-        "id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id, attendance_enabled, attendance_method, attendance_radius_meters"
+        "id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id, attendance_enabled, attendance_method, attendance_radius_meters, live_map_enabled"
       )
       .in("id", pendingEventIds);
 
@@ -686,7 +688,6 @@ export async function deleteHostedEvent(eventId: string): Promise<{ error: strin
     return { error: "Event not found or you do not have permission to delete it." };
   }
 
-  await stopEventLocationSharing(eventId);
   return { error: null };
 }
 
@@ -715,11 +716,6 @@ export async function leaveEvent(eventId: string): Promise<{ error: string | nul
 
   if (!data) {
     return { error: "Invite not found or you do not have permission to leave this event." };
-  }
-
-  const { error: stopShareError } = await stopEventLocationSharing(eventId);
-  if (stopShareError) {
-    return { error: stopShareError };
   }
 
   return { error: null };

@@ -81,6 +81,7 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
     visibility,
     selectedCategory,
     invitedPeople,
+    liveMapEnabled,
   } = route.params;
 
   const [selectedMethod, setSelectedMethod] = useState<EventAttendanceMethod>("gps_geofence");
@@ -267,6 +268,7 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
         attendance_enabled: true,
         attendance_method: selectedMethod,
         attendance_radius_meters: selectedMethod === "gps_geofence" ? attendanceRadiusMeters : null,
+        live_map_enabled: liveMapEnabled,
         status: "scheduled",
         started_at: null,
         ended_at: null,
@@ -317,6 +319,7 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
       eventId: createdEvent.id,
       presenceDetectionEnabled: true,
       presenceDetectionMethod: selectedMethod,
+      liveMapEnabled,
       behaviorTriggers: triggerRows,
     });
 
@@ -505,6 +508,10 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Behavior summary</Text>
           <Text style={styles.cardText}>{selectedPresenceOption.title}</Text>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryDot} />
+            <Text style={styles.summaryText}>Live map is {liveMapEnabled ? "enabled" : "disabled"}</Text>
+          </View>
           <View style={styles.summaryRow}>
             <View style={styles.summaryDot} />
             <Text style={styles.summaryText}>People are marked present inside {attendanceRadiusMeters} m</Text>

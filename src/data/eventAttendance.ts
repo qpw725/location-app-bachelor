@@ -19,6 +19,11 @@ type GpsPresenceAvailability = {
   userId: string;
 };
 
+type ExistingAttendanceRow = {
+  event_id: string;
+  checked_out_at: string | null;
+};
+
 export function isEventOngoing(event: Pick<EventItem, "startAt" | "endAt">) {
   if (!event.startAt || !event.endAt) {
     return false;
@@ -229,21 +234,58 @@ export async function updateGpsPresenceFromCoordinates(
   );
 
   const radiusMeters = event.attendanceRadiusMeters!;
+  const { data: existingAttendance, error: existingAttendanceError } = await supabase
+    .from("event_attendance")
+    .select("event_id, checked_out_at")
+    .eq("event_id", event.id)
+    .eq("user_id", userId)
+    .maybeSingle<ExistingAttendanceRow>();
+
+  if (existingAttendanceError) {
+    return { status: "error", reason: existingAttendanceError.message };
+  }
+
   if (distanceMeters > radiusMeters) {
+    if (existingAttendance && !existingAttendance.checked_out_at) {
+      const { error: checkoutError } = await supabase
+        .from("event_attendance")
+        .update({ checked_out_at: new Date().toISOString() })
+        .eq("event_id", event.id)
+        .eq("user_id", userId);
+
+      if (checkoutError) {
+        return { status: "error", reason: checkoutError.message };
+      }
+    }
+
     return { status: "outside_geofence", distanceMeters, radiusMeters };
   }
 
-  const { error: insertError } = await supabase.from("event_attendance").upsert(
-    [
-      {
-        event_id: event.id,
-        user_id: userId,
-        checked_in_at: new Date().toISOString(),
-        method: "gps_geofence",
-      },
-    ],
-    { onConflict: "event_id,user_id" }
-  );
+  if (existingAttendance) {
+    if (existingAttendance.checked_out_at) {
+      const { error: reenterError } = await supabase
+        .from("event_attendance")
+        .update({ checked_out_at: null })
+        .eq("event_id", event.id)
+        .eq("user_id", userId);
+
+      if (reenterError) {
+        return { status: "error", reason: reenterError.message };
+      }
+    }
+
+    return { status: "checked_in", distanceMeters };
+  }
+
+  const { error: insertError } = await supabase.from("event_attendance").insert([
+    {
+      event_id: event.id,
+      user_id: userId,
+      checked_in_at: new Date().toISOString(),
+      checked_out_at: null,
+      method: "gps_geofence",
+    },
+  ]);
 
   if (insertError) {
     return { status: "error", reason: insertError.message };

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import MapView, { Marker, Region } from "react-native-maps";
 import type { RootStackParamList } from "../../../App";
@@ -11,7 +11,6 @@ import {
   type EventMapDetails,
   type LiveEventParticipant,
 } from "../../data/eventLiveLocation";
-import { startEventLocationSharing, stopEventLocationSharing } from "../../locationSharingManager";
 import { supabase } from "../../supabase";
 
 type Props = NativeStackScreenProps<RootStackParamList, "LiveEventMap">;
@@ -29,16 +28,11 @@ export default function LiveEventMapScreen({ route }: Props) {
   const [participants, setParticipants] = useState<LiveEventParticipant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isSharing, setIsSharing] = useState(false);
-  const [isBusySharing, setIsBusySharing] = useState(false);
 
   const loadMap = useCallback(async () => {
     setError(null);
 
-    const [detailsResult, participantsResult] = await Promise.all([
-      fetchEventMapDetails(eventId),
-      fetchEventLiveParticipants(eventId),
-    ]);
+    const detailsResult = await fetchEventMapDetails(eventId);
 
     if (detailsResult.error || !detailsResult.data) {
       setError(detailsResult.error ?? "Could not load event map.");
@@ -52,63 +46,31 @@ export default function LiveEventMapScreen({ route }: Props) {
       return;
     }
 
+    setEventDetails(detailsResult.data);
+
+    if (!detailsResult.data.liveMapEnabled) {
+      setParticipants([]);
+      setLoading(false);
+      return;
+    }
+
+    if (!isEventShareWindowOpen(detailsResult.data)) {
+      setParticipants([]);
+      setLoading(false);
+      return;
+    }
+
+    const participantsResult = await fetchEventLiveParticipants(eventId);
+
     if (participantsResult.error) {
       setError(participantsResult.error);
       setLoading(false);
       return;
     }
 
-    setEventDetails(detailsResult.data);
     setParticipants(participantsResult.data ?? []);
-    setIsSharing(detailsResult.data.isSharingActive);
     setLoading(false);
   }, [eventId]);
-
-  const handleStopSharing = useCallback(async () => {
-    setIsBusySharing(true);
-
-    const { error: stopError } = await stopEventLocationSharing(eventId);
-
-    setIsBusySharing(false);
-
-    if (stopError) {
-      setError(stopError);
-      return;
-    }
-
-    setIsSharing(false);
-    await loadMap();
-  }, [eventId, loadMap]);
-
-  const handleStartSharing = useCallback(async () => {
-    if (!eventDetails) {
-      return;
-    }
-
-    if (!isEventShareWindowOpen(eventDetails)) {
-      setError("Location sharing becomes available shortly before the event starts.");
-      return;
-    }
-
-    setError(null);
-    setIsBusySharing(true);
-
-    const startResult = await startEventLocationSharing({
-      eventId,
-      startAt: eventDetails.startAt,
-      endAt: eventDetails.endedAt ?? eventDetails.endAt,
-    });
-
-    if (startResult.error) {
-      setIsBusySharing(false);
-      setError(startResult.error);
-      return;
-    }
-
-    setIsSharing(true);
-    setIsBusySharing(false);
-    await loadMap();
-  }, [eventDetails, eventId, loadMap]);
 
   useEffect(() => {
     void loadMap();
@@ -136,17 +98,6 @@ export default function LiveEventMapScreen({ route }: Props) {
     };
   }, [eventId, loadMap]);
 
-  useEffect(() => {
-    if (!eventDetails || !isSharing) {
-      return;
-    }
-
-    const endTime = eventDetails.endedAt?.getTime() ?? eventDetails.endAt?.getTime() ?? eventDetails.startAt?.getTime() ?? 0;
-    if (endTime > 0 && endTime < Date.now()) {
-      void handleStopSharing();
-    }
-  }, [eventDetails, handleStopSharing, isSharing]);
-
   const region = useMemo<Region>(() => {
     if (eventDetails && hasEventMapCoordinates(eventDetails)) {
       return {
@@ -169,14 +120,12 @@ export default function LiveEventMapScreen({ route }: Props) {
     return DEFAULT_REGION;
   }, [eventDetails, participants]);
 
-  const shareWindowOpen = eventDetails ? isEventShareWindowOpen(eventDetails) : false;
-
   const shareWindowLabel = useMemo(() => {
     if (!eventDetails?.startAt) {
-      return "Location sharing becomes available shortly before the event starts.";
+      return "Live map locations become available shortly before the event starts.";
     }
 
-    return `Sharing opens about 60 minutes before ${eventDetails.startAt.toLocaleTimeString([], {
+    return `Live map updates open about 60 minutes before ${eventDetails.startAt.toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
     })}.`;
@@ -214,7 +163,21 @@ export default function LiveEventMapScreen({ route }: Props) {
         </View>
       ) : null}
 
-      {eventDetails && hasEventMapCoordinates(eventDetails) ? (
+      {eventDetails && !eventDetails.liveMapEnabled ? (
+        <View style={styles.infoCard}>
+          <Text style={styles.infoTitle}>Live map disabled</Text>
+          <Text style={styles.infoText}>This event does not show attendee locations on the live map.</Text>
+        </View>
+      ) : null}
+
+      {eventDetails && eventDetails.liveMapEnabled && !isEventShareWindowOpen(eventDetails) ? (
+        <View style={styles.infoCard}>
+          <Text style={styles.infoTitle}>Live map not open yet</Text>
+          <Text style={styles.infoText}>{shareWindowLabel}</Text>
+        </View>
+      ) : null}
+
+      {eventDetails && eventDetails.liveMapEnabled && isEventShareWindowOpen(eventDetails) && hasEventMapCoordinates(eventDetails) ? (
         <View style={styles.mapWrap}>
           <MapView style={styles.map} region={region}>
             <Marker
@@ -252,51 +215,12 @@ export default function LiveEventMapScreen({ route }: Props) {
         </View>
       ) : null}
 
-      {eventDetails ? (
-        <View style={styles.shareCard}>
-          <Text style={styles.shareTitle}>Location sharing</Text>
-          {shareWindowOpen ? (
-            <Text style={styles.shareText}>
-              {isSharing
-                ? "Your live location is being shared and will keep updating until you stop sharing or the event ends."
-                : "Share your live location so other attendees can see you on the event map."}
-            </Text>
-          ) : (
-            <Text style={styles.shareText}>{shareWindowLabel}</Text>
-          )}
-
-          <View style={styles.shareActionRow}>
-            {!isSharing ? (
-              <Pressable
-                style={[styles.primaryButton, (!shareWindowOpen || isBusySharing) && styles.buttonDisabled]}
-                onPress={() => {
-                  if (!shareWindowOpen) {
-                    Alert.alert("Too early to share", shareWindowLabel);
-                    return;
-                  }
-                  void handleStartSharing();
-                }}
-                disabled={!shareWindowOpen || isBusySharing}
-              >
-                <Text style={styles.primaryButtonText}>{isBusySharing ? "Starting..." : "Share my location"}</Text>
-              </Pressable>
-            ) : (
-              <Pressable
-                style={[styles.secondaryButton, isBusySharing && styles.buttonDisabled]}
-                onPress={() => void handleStopSharing()}
-                disabled={isBusySharing}
-              >
-                <Text style={styles.secondaryButtonText}>{isBusySharing ? "Stopping..." : "Stop sharing"}</Text>
-              </Pressable>
-            )}
-          </View>
-        </View>
-      ) : null}
-
       <View style={styles.participantsCard}>
         <Text style={styles.participantsTitle}>Live attendees</Text>
-        {participants.length === 0 ? (
-          <Text style={styles.emptyText}>No one is sharing their location right now.</Text>
+        {!eventDetails?.liveMapEnabled ? (
+          <Text style={styles.emptyText}>Live attendee locations are disabled for this event.</Text>
+        ) : participants.length === 0 ? (
+          <Text style={styles.emptyText}>No current GPS presence updates are available right now.</Text>
         ) : (
           participants.map((participant) => (
             <View key={participant.id} style={styles.participantRow}>
@@ -508,55 +432,6 @@ const styles = StyleSheet.create({
     color: "#1f4fa3",
     fontSize: 13,
     fontWeight: "800",
-  },
-  shareCard: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    padding: 16,
-    marginBottom: 12,
-  },
-  shareTitle: {
-    color: "#201c19",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  shareText: {
-    color: "#67594d",
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 6,
-  },
-  shareActionRow: {
-    marginTop: 12,
-  },
-  primaryButton: {
-    backgroundColor: "#2f5d50",
-    borderRadius: 16,
-    paddingVertical: 13,
-    alignItems: "center",
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  secondaryButton: {
-    backgroundColor: "#f6eee4",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    paddingVertical: 13,
-    alignItems: "center",
-  },
-  secondaryButtonText: {
-    color: "#4f4339",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  buttonDisabled: {
-    opacity: 0.6,
   },
   participantsCard: {
     backgroundColor: "#fffaf4",

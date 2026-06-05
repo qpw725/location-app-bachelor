@@ -32,6 +32,7 @@ type InviteRow = {
 type AttendanceRow = {
   user_id: string;
   checked_in_at: string | null;
+  checked_out_at: string | null;
 };
 
 type LiveLocationRow = {
@@ -58,6 +59,7 @@ export type EventPresencePerson = {
   isPresent: boolean;
   hasCheckedIn: boolean;
   checkedInAt: string | null;
+  checkedOutAt: string | null;
   lastLocationAt: string | null;
   distanceMeters: number | null;
   presenceState: "present" | "not_arrived" | "left" | "stale";
@@ -228,7 +230,7 @@ async function fetchEventPresencePeople(event: EventItem): Promise<{ data: Event
     { data: liveLocationRows, error: liveLocationError },
   ] = await Promise.all([
     supabase.from("event_invites").select("invitee_id, status").eq("event_id", event.id),
-    supabase.from("event_attendance").select("user_id, checked_in_at").eq("event_id", event.id),
+    supabase.from("event_attendance").select("user_id, checked_in_at, checked_out_at").eq("event_id", event.id),
     supabase.from("event_live_locations").select("user_id, latitude, longitude, updated_at").eq("event_id", event.id),
   ]);
 
@@ -250,9 +252,9 @@ async function fetchEventPresencePeople(event: EventItem): Promise<{ data: Event
     .filter((id) => id !== event.creatorId);
 
   const participantIds = Array.from(new Set([event.creatorId, ...acceptedInviteIds]));
-  const attendanceMap = new Map<string, string | null>();
+  const attendanceMap = new Map<string, AttendanceRow>();
   for (const row of (attendanceRows ?? []) as AttendanceRow[]) {
-    attendanceMap.set(row.user_id, row.checked_in_at);
+    attendanceMap.set(row.user_id, row);
   }
 
   const liveLocationMap = new Map<string, LiveLocationRow>();
@@ -286,7 +288,9 @@ async function fetchEventPresencePeople(event: EventItem): Promise<{ data: Event
       }
 
       const liveLocation = liveLocationMap.get(id);
-      const checkedInAt = attendanceMap.get(id) ?? null;
+      const attendance = attendanceMap.get(id);
+      const checkedInAt = attendance?.checked_in_at ?? null;
+      const checkedOutAt = attendance?.checked_out_at ?? null;
       const hasCheckedIn = attendanceMap.has(id);
       const distanceMeters =
         liveLocation && hasEventCoordinates(event)
@@ -315,6 +319,7 @@ async function fetchEventPresencePeople(event: EventItem): Promise<{ data: Event
         isPresent: presenceState === "present",
         hasCheckedIn,
         checkedInAt,
+        checkedOutAt,
         lastLocationAt: liveLocation?.updated_at ?? null,
         distanceMeters,
         presenceState,

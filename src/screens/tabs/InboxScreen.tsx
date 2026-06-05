@@ -62,6 +62,8 @@ type EventRow = {
   location: string | null;
   start_time: string | null;
   end_time: string | null;
+  status: string | null;
+  ended_at: string | null;
   creator_id: string | null;
 };
 
@@ -85,6 +87,22 @@ function formatEventTime(startIso: string | null, endIso: string | null) {
   }
   const endLabel = end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   return `${dateLabel} ${startLabel} - ${endLabel}`;
+}
+
+function isFinishedEvent(event: Pick<EventRow, "start_time" | "end_time" | "status" | "ended_at">) {
+  if (event.status === "ended" || event.status === "cancelled") {
+    return true;
+  }
+
+  const endMs = event.ended_at
+    ? new Date(event.ended_at).getTime()
+    : event.end_time
+      ? new Date(event.end_time).getTime()
+      : event.start_time
+        ? new Date(event.start_time).getTime()
+        : NaN;
+
+  return Number.isFinite(endMs) && endMs < Date.now();
 }
 
 export default function InboxScreen() {
@@ -242,7 +260,7 @@ export default function InboxScreen() {
     if (eventIds.length > 0) {
       const { data: eventRows, error: eventsError } = await supabase
         .from("events")
-        .select("id, title, location, start_time, end_time, creator_id")
+        .select("id, title, location, start_time, end_time, status, ended_at, creator_id")
         .in("id", eventIds);
 
       if (eventsError) {
@@ -282,7 +300,7 @@ export default function InboxScreen() {
       ((eventInviteRows ?? []) as EventInviteRow[])
         .map((invite) => {
           const event = eventMap.get(invite.event_id);
-          if (!event) {
+          if (!event || isFinishedEvent(event)) {
             return null;
           }
 
@@ -410,6 +428,25 @@ export default function InboxScreen() {
 
     setErrorMessage(null);
     setSuccessMessage(null);
+
+    if (status === "accepted") {
+      const { data: event, error: eventError } = await supabase
+        .from("events")
+        .select("id, start_time, end_time, status, ended_at")
+        .eq("id", eventId)
+        .maybeSingle<EventRow>();
+
+      if (eventError) {
+        setErrorMessage(eventError.message);
+        return;
+      }
+
+      if (!event || isFinishedEvent(event)) {
+        setErrorMessage("This event has already ended.");
+        await loadSocialData(userId);
+        return;
+      }
+    }
 
     const { error } = await supabase
       .from("event_invites")

@@ -20,7 +20,6 @@ let locationSubscription: Location.LocationSubscription | null = null;
 let appStateSubscription: NativeEventSubscription | null = null;
 let startPromise: Promise<void> | null = null;
 let isStarted = false;
-let hasRequestedLocationPermission = false;
 const missingReminderEventIds = new Set<string>();
 const capacityWarningEventIds = new Set<string>();
 const endedByHostLeaveEventIds = new Set<string>();
@@ -182,8 +181,7 @@ async function ensureLocationUpdatesRunning() {
   }
 
   let permission = await Location.getForegroundPermissionsAsync();
-  if (!permission.granted && !hasRequestedLocationPermission) {
-    hasRequestedLocationPermission = true;
+  if (!permission.granted) {
     permission = await Location.requestForegroundPermissionsAsync();
   }
 
@@ -277,7 +275,6 @@ export function stopOpenAppEventPresenceTracking() {
   isStarted = false;
   activeEvents = [];
   activeUserId = null;
-  hasRequestedLocationPermission = false;
   missingReminderEventIds.clear();
   capacityWarningEventIds.clear();
   endedByHostLeaveEventIds.clear();

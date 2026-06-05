@@ -300,7 +300,7 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
           {event.attendanceEnabled && runtimeStatus?.canShowLiveState ? (
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>Your presence</Text>
-              <PersonalPresenceCard presence={runtimeStatus.viewerPresence} />
+              <PersonalPresenceCard presence={runtimeStatus.viewerPresence} eventEnded={runtimeStatus.status === "ended"} />
             </View>
           ) : null}
 
@@ -317,7 +317,7 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
                 <Text style={styles.calendarButtonText}>Add to calendar</Text>
               </Pressable>
 
-              {source !== "past" ? (
+              {source !== "past" && event.liveMapEnabled ? (
                 <Pressable style={styles.primaryButton} onPress={openMap} disabled={processingAction}>
                   <Text style={styles.primaryButtonText}>Map</Text>
                 </Pressable>
@@ -401,8 +401,8 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PersonalPresenceCard({ presence }: { presence: EventPresencePerson | null }) {
-  const model = getPersonalPresenceModel(presence);
+function PersonalPresenceCard({ presence, eventEnded }: { presence: EventPresencePerson | null; eventEnded: boolean }) {
+  const model = getPersonalPresenceModel(presence, eventEnded);
 
   return (
     <View style={[styles.personalPresenceCard, model.tone === "success" && styles.personalPresenceSuccess, model.tone === "warning" && styles.personalPresenceWarning]}>
@@ -589,8 +589,9 @@ function getAttendanceTimingLines(participant: EventPresencePerson, eventStartAt
     lines.push("No arrival recorded");
   }
 
-  if (participant.presenceState === "left" && participant.lastLocationAt) {
-    const leftAt = new Date(participant.lastLocationAt);
+  const checkedOutAt = participant.checkedOutAt ? new Date(participant.checkedOutAt) : null;
+  if (participant.presenceState === "left" && checkedOutAt) {
+    const leftAt = checkedOutAt;
     lines.push(`Left area ${formatShortTime(leftAt)}${isBeforeEventEnd(leftAt, eventEndAt) ? " - before end" : ""}`);
   }
 
@@ -626,7 +627,7 @@ function formatShortTime(date: Date) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-function getPersonalPresenceModel(presence: EventPresencePerson | null) {
+function getPersonalPresenceModel(presence: EventPresencePerson | null, eventEnded: boolean) {
   if (!presence) {
     return {
       tone: "warning" as const,
@@ -638,16 +639,22 @@ function getPersonalPresenceModel(presence: EventPresencePerson | null) {
   if (presence.presenceState === "present") {
     return {
       tone: "success" as const,
-      title: "You are present",
-      message: presence.isHost ? "Your host presence can activate the event." : "You are currently inside the event area.",
+      title: eventEnded ? "You were present" : "You are present",
+      message: eventEnded
+        ? "You were marked present for this event."
+        : presence.isHost
+          ? "Your host presence can activate the event."
+          : "You are currently inside the event area.",
     };
   }
 
   if (presence.presenceState === "not_arrived") {
     return {
       tone: "warning" as const,
-      title: "You are not present yet",
-      message: "Keep the app open near the event area so your presence can update.",
+      title: eventEnded ? "You were not marked present" : "You are not present yet",
+      message: eventEnded
+        ? "No GPS check-in was recorded for you before the event ended."
+        : "Keep the app open near the event area so your presence can update.",
     };
   }
 
@@ -655,14 +662,18 @@ function getPersonalPresenceModel(presence: EventPresencePerson | null) {
     return {
       tone: "warning" as const,
       title: "You left the event area",
-      message: "Your latest location is outside the configured event radius.",
+      message: eventEnded
+        ? "You were checked in, but your latest event location was outside the configured radius."
+        : "Your latest location is outside the configured event radius.",
     };
   }
 
   return {
     tone: "warning" as const,
-    title: "Location inactive",
-    message: "Your last event location update is stale. Keep the app open to refresh your presence.",
+    title: eventEnded ? "Location was inactive" : "Location inactive",
+    message: eventEnded
+      ? "Your last event location update became inactive before the event ended."
+      : "Your last event location update is stale. Keep the app open to refresh your presence.",
   };
 }
 

@@ -11,6 +11,7 @@ type EventMapRow = {
   end_time: string | null;
   creator_id: string | null;
   pre_event_window_minutes: number | null;
+  live_map_enabled: boolean | null;
   status: string | null;
   ended_at: string | null;
 };
@@ -41,8 +42,8 @@ export type EventMapDetails = {
   endedAt: Date | null;
   status: "scheduled" | "pre_event" | "ready" | "active" | "ended" | "cancelled";
   preEventWindowMinutes: number;
+  liveMapEnabled: boolean;
   canViewMap: boolean;
-  isSharingActive: boolean;
 };
 
 export type LiveEventParticipant = {
@@ -127,7 +128,7 @@ export async function fetchEventMapDetails(eventId: string): Promise<{ data: Eve
 
   const { data: event, error: eventError } = await supabase
     .from("events")
-    .select("id, title, location, latitude, longitude, start_time, end_time, creator_id, pre_event_window_minutes, status, ended_at")
+    .select("id, title, location, latitude, longitude, start_time, end_time, creator_id, pre_event_window_minutes, live_map_enabled, status, ended_at")
     .eq("id", eventId)
     .maybeSingle<EventMapRow>();
 
@@ -156,17 +157,6 @@ export async function fetchEventMapDetails(eventId: string): Promise<{ data: Eve
     canViewMap = invite?.status?.toLowerCase() === "accepted";
   }
 
-  const { data: myLiveLocation, error: liveLocationError } = await supabase
-    .from("event_live_locations")
-    .select("user_id")
-    .eq("event_id", eventId)
-    .eq("user_id", user.id)
-    .maybeSingle<{ user_id: string }>();
-
-  if (liveLocationError) {
-    return { data: null, error: liveLocationError.message };
-  }
-
   return {
     data: {
       id: event.id,
@@ -182,8 +172,8 @@ export async function fetchEventMapDetails(eventId: string): Promise<{ data: Eve
         typeof event.pre_event_window_minutes === "number" && event.pre_event_window_minutes >= 0
           ? event.pre_event_window_minutes
           : 60,
+      liveMapEnabled: Boolean(event.live_map_enabled),
       canViewMap,
-      isSharingActive: Boolean(myLiveLocation?.user_id),
     },
     error: null,
   };

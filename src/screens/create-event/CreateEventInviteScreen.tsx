@@ -7,6 +7,7 @@ import {
   TextInput,
   ScrollView,
   KeyboardAvoidingView,
+  Switch,
 } from "react-native";
 import { CommonActions } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -45,6 +46,7 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
   const [visibility, setVisibility] = useState<"Private" | "Public">("Private");
   const [selectedCategory, setSelectedCategory] = useState(categoryOptions[0]);
   const [attendanceCountingEnabled, setAttendanceCountingEnabled] = useState(false);
+  const [liveMapEnabled, setLiveMapEnabled] = useState(false);
   const [inviteInput, setInviteInput] = useState("");
   const [invitedPeople, setInvitedPeople] = useState<EventInvitee[]>([]);
   const [inviteError, setInviteError] = useState<string | null>(null);
@@ -320,6 +322,7 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
         attendance_enabled: false,
         attendance_method: null,
         attendance_radius_meters: null,
+        live_map_enabled: liveMapEnabled,
         status: "scheduled",
         started_at: null,
         ended_at: null,
@@ -379,6 +382,7 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
       visibility,
       selectedCategory,
       invitedPeople,
+      liveMapEnabled,
     });
   }
 
@@ -449,7 +453,12 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
               <Pressable
                 key={option.label}
                 style={[styles.optionChip, attendanceCountingEnabled === option.value && styles.optionChipActive]}
-                onPress={() => setAttendanceCountingEnabled(option.value)}
+                onPress={() => {
+                  setAttendanceCountingEnabled(option.value);
+                  if (!option.value) {
+                    setLiveMapEnabled(false);
+                  }
+                }}
               >
                 <Text style={[styles.optionChipText, attendanceCountingEnabled === option.value && styles.optionChipTextActive]}>
                   {option.label}
@@ -460,6 +469,24 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
           {attendanceCountingEnabled ? (
             <Text style={styles.helperText}>Add presence detection and trigger rules for this event.</Text>
           ) : null}
+
+          <View style={styles.switchRow}>
+            <View style={styles.switchTextWrap}>
+              <Text style={styles.switchTitle}>Live map</Text>
+              <Text style={styles.switchDescription}>Show live attendee markers during the event window.</Text>
+            </View>
+            <Switch
+              value={liveMapEnabled}
+              onValueChange={(enabled) => {
+                setLiveMapEnabled(enabled);
+                if (enabled) {
+                  setAttendanceCountingEnabled(true);
+                }
+              }}
+              trackColor={{ false: "#d8c7b3", true: "#b8d2c4" }}
+              thumbColor={liveMapEnabled ? "#2f5d50" : "#fffaf4"}
+            />
+          </View>
 
         </View>
 
@@ -616,6 +643,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     marginTop: 8,
+  },
+  switchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#efe4d7",
+    marginTop: 14,
+    paddingTop: 14,
+  },
+  switchTextWrap: {
+    flex: 1,
+  },
+  switchTitle: {
+    color: "#201c19",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  switchDescription: {
+    color: "#6f6258",
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 3,
   },
   inviteRow: { flexDirection: "row", gap: 8, alignItems: "center" },
   input: {
