@@ -75,7 +75,6 @@ function getRuntimeStatusLabel(status: EventRuntimeStatus | null | undefined) {
   if (status.status === "ready") return "Ready";
   if (status.status === "active") return "Active";
   if (status.status === "ended") return "Ended";
-  if (status.status === "cancelled") return "Cancelled";
 
   return "Event status";
 }

@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { CommonActions } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import Slider from "@react-native-community/slider";
 import type { EventAttendanceMethod, RootStackParamList } from "../../../App";
 import StepIndicator from "../../components/StepIndicator";
 import { saveEventBehaviorTriggers, type EventTriggerInput } from "../../data/eventRules";
 import { supabase } from "../../supabase";
-import { commonStyles } from "../../styles/common";
+import { colors, commonStyles } from "../../styles/common";
 
 type Props = NativeStackScreenProps<RootStackParamList, "CreateEventAttendance">;
 
@@ -82,10 +82,10 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
     visibility,
     selectedCategory,
     invitedPeople,
-    liveMapEnabled,
   } = route.params;
 
   const [selectedMethod, setSelectedMethod] = useState<EventAttendanceMethod>("gps_geofence");
+  const [liveMapEnabled, setLiveMapEnabled] = useState(false);
   const [attendanceRadiusMeters, setAttendanceRadiusMeters] = useState(75);
   const [attendanceRadiusInput, setAttendanceRadiusInput] = useState("75");
   const [enabledRules, setEnabledRules] = useState<Record<BehaviorRuleId, boolean>>({
@@ -426,6 +426,21 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
         ) : null}
 
         <View style={commonStyles.card}>
+          <View style={styles.switchRow}>
+            <View style={styles.switchTextWrap}>
+              <Text style={styles.switchTitle}>Live map</Text>
+              <Text style={styles.switchDescription}>Show live attendee markers during the event window.</Text>
+            </View>
+            <Switch
+              value={liveMapEnabled}
+              onValueChange={setLiveMapEnabled}
+              trackColor={{ false: "#d8c7b3", true: "#b8d2c4" }}
+              thumbColor={liveMapEnabled ? colors.primary : colors.surface}
+            />
+          </View>
+        </View>
+
+        <View style={commonStyles.card}>
           <View style={styles.ruleHeader}>
             <Text style={styles.cardTitleNoMargin}>Trigger rules</Text>
             <Text style={styles.ruleCounter}>{enabledRuleCount} selected</Text>
@@ -642,6 +657,26 @@ const styles = StyleSheet.create({
     color: "#8a7f74",
     fontSize: 12,
     fontWeight: "700",
+  },
+  switchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  switchTextWrap: {
+    flex: 1,
+  },
+  switchTitle: {
+    color: "#201c19",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  switchDescription: {
+    color: "#6f6258",
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 3,
   },
   ruleHeader: {
     flexDirection: "row",

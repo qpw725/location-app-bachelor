@@ -64,7 +64,7 @@ export type EventItem = {
   attendanceMethod: string | null;
   attendanceRadiusMeters: number | null;
   liveMapEnabled: boolean;
-  status: "scheduled" | "pre_event" | "ready" | "active" | "ended" | "cancelled";
+  status: "scheduled" | "pre_event" | "ready" | "active" | "ended";
   startedAt: Date | null;
   endedAt: Date | null;
   endedReason: string | null;
@@ -179,7 +179,7 @@ function mapEventRow(row: DbEventRow, creatorProfile: ProfileRow | undefined, ac
 }
 
 function isPastEvent(event: EventItem, now: number) {
-  if (event.status === "ended" || event.status === "cancelled") {
+  if (event.status === "ended") {
     return true;
   }
 
@@ -193,8 +193,7 @@ function normalizeEventStatus(value: string | null): EventItem["status"] {
     value === "pre_event" ||
     value === "ready" ||
     value === "active" ||
-    value === "ended" ||
-    value === "cancelled"
+    value === "ended"
   ) {
     return value;
   }
@@ -384,10 +383,6 @@ export async function joinPublicEvent(eventId: string): Promise<{ error: string 
       : event.start_time
         ? new Date(event.start_time).getTime()
         : NaN;
-  if (event.status === "cancelled") {
-    return { error: "This event has been cancelled." };
-  }
-
   if (event.status === "ended") {
     return { error: "This event has already ended." };
   }
@@ -449,7 +444,7 @@ export async function fetchHomeOverview(): Promise<{ data: HomeOverview | null; 
   const now = Date.now();
   const hostingEventIds = new Set<string>();
   for (const row of (hostingRows ?? []) as Array<{ id: string; start_time: string | null; end_time: string | null; status: string | null; ended_at: string | null }>) {
-    if (row.status === "ended" || row.status === "cancelled") {
+    if (row.status === "ended") {
       continue;
     }
 
@@ -504,7 +499,7 @@ export async function fetchHomeOverview(): Promise<{ data: HomeOverview | null; 
     }
 
     for (const row of (invitedEventRows ?? []) as Array<{ id: string; start_time: string | null; end_time: string | null; status: string | null; ended_at: string | null }>) {
-      if (row.status === "ended" || row.status === "cancelled") {
+      if (row.status === "ended") {
         continue;
       }
 

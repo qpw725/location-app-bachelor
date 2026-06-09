@@ -40,7 +40,7 @@ export type EventMapDetails = {
   startAt: Date | null;
   endAt: Date | null;
   endedAt: Date | null;
-  status: "scheduled" | "pre_event" | "ready" | "active" | "ended" | "cancelled";
+  status: "scheduled" | "pre_event" | "ready" | "active" | "ended";
   preEventWindowMinutes: number;
   liveMapEnabled: boolean;
   canViewMap: boolean;
@@ -90,7 +90,7 @@ export function isEventShareWindowOpen(
   },
   leadMinutes = 60
 ) {
-  if (event.status === "ended" || event.status === "cancelled") {
+  if (event.status === "ended") {
     return false;
   }
 
@@ -185,8 +185,7 @@ function normalizeEventStatus(value: string | null): EventMapDetails["status"] {
     value === "pre_event" ||
     value === "ready" ||
     value === "active" ||
-    value === "ended" ||
-    value === "cancelled"
+    value === "ended"
   ) {
     return value;
   }

@@ -91,7 +91,7 @@ function formatEventTime(startIso: string | null, endIso: string | null) {
 }
 
 function isFinishedEvent(event: Pick<EventRow, "start_time" | "end_time" | "status" | "ended_at">) {
-  if (event.status === "ended" || event.status === "cancelled") {
+  if (event.status === "ended") {
     return true;
   }
 

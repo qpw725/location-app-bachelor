@@ -76,8 +76,7 @@ export type EventRuntimeStatusId =
   | "event_full"
   | "ready"
   | "active"
-  | "ended"
-  | "cancelled";
+  | "ended";
 
 export type EventRuntimeSeverity = "neutral" | "warning" | "success" | "danger";
 
@@ -384,24 +383,6 @@ function deriveRuntimeStatus(input: {
   const isInPreEventWindow = Number.isFinite(statusOpenMs) && now >= statusOpenMs && isBeforeStart;
   const canAutoStartBeforeScheduledTime = event.startMode === "auto_on_ready";
   const isManualStartRequired = event.startMode === "manual" && !isManuallyActivated;
-
-  if (event.status === "cancelled") {
-    return createRuntimeStatus({
-      status: "cancelled",
-      severity: "neutral",
-      title: "Event cancelled",
-      message: "This event has been cancelled.",
-      canShowLiveState,
-      presentCount,
-      acceptedCount,
-      missingParticipants,
-      leftParticipants,
-      viewerPresence,
-      hostPresent,
-      minimumPresentCount,
-      capacityLimit,
-    });
-  }
 
   if (event.status === "ended" || (Number.isFinite(endedMs) && now >= endedMs)) {
     return createRuntimeStatus({

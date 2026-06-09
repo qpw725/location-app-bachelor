@@ -47,7 +47,6 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
   const [visibility, setVisibility] = useState<"Private" | "Public">("Private");
   const [selectedCategory, setSelectedCategory] = useState(categoryOptions[0]);
   const [attendanceCountingEnabled, setAttendanceCountingEnabled] = useState(false);
-  const [liveMapEnabled, setLiveMapEnabled] = useState(false);
   const [inviteInput, setInviteInput] = useState("");
   const [invitedPeople, setInvitedPeople] = useState<EventInvitee[]>([]);
   const [inviteError, setInviteError] = useState<string | null>(null);
@@ -323,7 +322,7 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
         attendance_enabled: false,
         attendance_method: null,
         attendance_radius_meters: null,
-        live_map_enabled: liveMapEnabled,
+        live_map_enabled: false,
         status: "scheduled",
         started_at: null,
         ended_at: null,
@@ -342,7 +341,6 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
 
     if (invitedPeople.length > 0) {
       const inviteRows = invitedPeople
-        .filter((profile) => profile.id !== userData.user.id)
         .map((profile) => ({
           event_id: createdEvent.id,
           invitee_id: profile.id,
@@ -383,7 +381,6 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
       visibility,
       selectedCategory,
       invitedPeople,
-      liveMapEnabled,
     });
   }
 
@@ -445,50 +442,20 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
             ))}
           </View>
 
-          <Text style={styles.settingLabel}>Event behavior</Text>
-          <View style={styles.toggleRow}>
-            {[
-              { label: "Basic", value: false },
-              { label: "Configurable", value: true },
-            ].map((option) => (
-              <Pressable
-                key={option.label}
-                style={[styles.optionChip, attendanceCountingEnabled === option.value && styles.optionChipActive]}
-                onPress={() => {
-                  setAttendanceCountingEnabled(option.value);
-                  if (!option.value) {
-                    setLiveMapEnabled(false);
-                  }
-                }}
-              >
-                <Text style={[styles.optionChipText, attendanceCountingEnabled === option.value && styles.optionChipTextActive]}>
-                  {option.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          {attendanceCountingEnabled ? (
-            <Text style={styles.helperText}>Add presence detection and trigger rules for this event.</Text>
-          ) : null}
-
           <View style={styles.switchRow}>
             <View style={styles.switchTextWrap}>
-              <Text style={styles.switchTitle}>Live map</Text>
-              <Text style={styles.switchDescription}>Show live attendee markers during the event window.</Text>
+              <Text style={styles.switchTitle}>GPS features</Text>
+              <Text style={styles.switchDescription}>
+                Configure presence detection, trigger rules and live map features for this event.
+              </Text>
             </View>
             <Switch
-              value={liveMapEnabled}
-              onValueChange={(enabled) => {
-                setLiveMapEnabled(enabled);
-                if (enabled) {
-                  setAttendanceCountingEnabled(true);
-                }
-              }}
+              value={attendanceCountingEnabled}
+              onValueChange={setAttendanceCountingEnabled}
               trackColor={{ false: "#d8c7b3", true: "#b8d2c4" }}
-              thumbColor={liveMapEnabled ? colors.primary : colors.surface}
+              thumbColor={attendanceCountingEnabled ? colors.primary : colors.surface}
             />
           </View>
-
         </View>
 
         <View style={commonStyles.card}>

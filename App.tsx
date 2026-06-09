@@ -87,7 +87,6 @@ export type RootStackParamList = {
     visibility: "Private" | "Public";
     selectedCategory: string;
     invitedPeople: EventInvitee[];
-    liveMapEnabled: boolean;
   };
   LiveEventMap: {
     eventId: string;
