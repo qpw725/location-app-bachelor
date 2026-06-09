@@ -12,6 +12,7 @@ import { useState } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../../App";
 import StepIndicator from "../../components/StepIndicator";
+import { colors, commonStyles } from "../../styles/common";
 
 
 type Props = NativeStackScreenProps<RootStackParamList, "CreateEventDetails">;
@@ -83,48 +84,48 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={commonStyles.screen}
       behavior="padding"
     >
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={commonStyles.scrollContent}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
         <StepIndicator step={1} total={3} label="Create event" />
-        <View style={styles.heroCard}>
-          <Text style={styles.title}>Set the basics for your event</Text>
-          <Text style={styles.heroText}>Choose the name, description, date, and timing before you move on to location.</Text>
+        <View style={commonStyles.heroCard}>
+          <Text style={commonStyles.heroTitle}>Set the basics for your event</Text>
+          <Text style={commonStyles.heroSubtitle}>Choose the name, description, date, and timing before you move on to location.</Text>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Details</Text>
-          <Text style={styles.label}>Event name</Text>
+        <View style={commonStyles.card}>
+          <Text style={commonStyles.cardTitle}>Details</Text>
+          <Text style={commonStyles.label}>Event name</Text>
           <TextInput
             value={eventName}
             onChangeText={setEventName}
             placeholder="e.g. Pre-drinks at Ben's"
             placeholderTextColor="#8a7f74"
-            style={styles.input}
+            style={commonStyles.input}
           />
 
-          <Text style={styles.label}>Description (optional)</Text>
+          <Text style={commonStyles.label}>Description (optional)</Text>
           <TextInput
             value={eventDescription}
             onChangeText={setEventDescription}
             placeholder="What is this event about?"
             placeholderTextColor="#8a7f74"
-            style={[styles.input, styles.descriptionInput]}
+            style={[commonStyles.input, styles.descriptionInput]}
             multiline
             textAlignVertical="top"
           />
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Date and time</Text>
+        <View style={commonStyles.card}>
+          <Text style={commonStyles.cardTitle}>Date and time</Text>
 
           <View style={styles.pickerSection}>
-            <Text style={styles.label}>Event date</Text>
+            <Text style={commonStyles.label}>Event date</Text>
 
             <View style={styles.iosPickerWrap}>
               <DateTimePicker
@@ -138,7 +139,7 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
           </View>
 
           <View style={styles.pickerSection}>
-            <Text style={styles.label}>Start time</Text>
+            <Text style={commonStyles.label}>Start time</Text>
 
             <View style={styles.iosPickerWrap}>
               <DateTimePicker
@@ -151,7 +152,7 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
           </View>
 
           <View style={styles.pickerSection}>
-            <Text style={styles.label}>End time</Text>
+            <Text style={commonStyles.label}>End time</Text>
 
             <View style={styles.iosPickerWrap}>
               <DateTimePicker
@@ -175,7 +176,7 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
         <View style={styles.spacer} />
 
         <Pressable
-          style={({ pressed }) => [styles.primaryButton, (!canContinue || pressed) && styles.primaryButtonPressed, !canContinue && styles.primaryButtonDisabled]}
+          style={({ pressed }) => [commonStyles.primaryButton, pressed && commonStyles.pressed, !canContinue && commonStyles.primaryButtonDisabled]}
           onPress={() =>
             navigation.navigate("CreateEventLocation", {
               eventName: eventName.trim(),
@@ -197,7 +198,7 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
           }
           disabled={!canContinue}
         >
-          <Text style={styles.primaryButtonText}>Choose location</Text>
+          <Text style={commonStyles.primaryButtonText}>Choose location</Text>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -205,52 +206,15 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f7f1e8" },
-  content: { flexGrow: 1, padding: 20, paddingBottom: 120 },
-  heroCard: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 28,
-    padding: 22,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    shadowColor: "#7a5c3d",
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 6,
-  },
-  title: { fontSize: 28, fontWeight: "800", marginBottom: 8, color: "#1f1a17" },
-  heroText: { fontSize: 15, lineHeight: 22, color: "#67594d" },
-  card: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    padding: 16,
-    marginBottom: 12,
-  },
-  cardTitle: { fontSize: 18, fontWeight: "700", color: "#201c19", marginBottom: 8 },
-  label: { fontSize: 14, marginBottom: 8, color: "#201c19", fontWeight: "700" },
-  input: {
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    backgroundColor: "#fffaf4",
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: "#201c19",
-  },
   pickerSection: { marginTop: 14 },
   iosPickerWrap: {
     borderWidth: 1,
-    borderColor: "#eadfce",
+    borderColor: colors.border,
     borderRadius: 14,
     paddingVertical: 8,
     paddingHorizontal: 10,
     alignItems: "stretch",
-    backgroundColor: "#fffaf4",
+    backgroundColor: colors.surface,
   },
   descriptionInput: {
     minHeight: 90,
@@ -264,24 +228,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
-  },
-  primaryButton: {
-    marginTop: 6,
-    paddingVertical: 15,
-    borderRadius: 16,
-    alignItems: "center",
-    backgroundColor: "#2f5d50",
-  },
-  primaryButtonPressed: {
-    opacity: 0.9,
-  },
-  primaryButtonDisabled: {
-    backgroundColor: "#97aa9f",
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontWeight: "800",
-    fontSize: 16,
   },
   spacer: { height: 16 },
 });

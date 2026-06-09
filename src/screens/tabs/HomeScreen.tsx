@@ -6,6 +6,7 @@ import type { MainTabParamList, RootStackParamList } from "../../../App";
 import { useCallback, useEffect, useState } from "react";
 import { fetchHomeActivity, fetchHomeOverview, type HomeActivityItem } from "../../data/eventStore";
 import { fetchCurrentProfile } from "../../profile";
+import { colors, commonStyles } from "../../styles/common";
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, "Home">,
@@ -63,13 +64,13 @@ export default function HomeScreen({ navigation }: Props) {
   ];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={commonStyles.screen} contentContainerStyle={commonStyles.scrollContent}>
       <View style={styles.hero}>
         <Text style={styles.eyebrow}>Home</Text>
         <Text style={styles.title}>Hi, {displayName}</Text>
         <Text style={styles.heroText}>Plan, host, and participate in events.</Text>
         <Pressable
-          style={({ pressed }) => [styles.primaryCard, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.primaryCard, pressed && commonStyles.pressed]}
           onPress={() => navigation.navigate("CreateEventDetails")}
         >
           <View style={styles.primaryCardContent}>
@@ -117,7 +118,7 @@ export default function HomeScreen({ navigation }: Props) {
             <Pressable
               key={item.id}
               onPress={() => navigation.navigate("Inbox")}
-              style={({ pressed }) => [styles.activityCard, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.activityCard, pressed && commonStyles.pressed]}
             >
               <View style={styles.activityHeader}>
                 <Text style={styles.activityBadge}>
@@ -136,16 +137,14 @@ export default function HomeScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f7f1e8" },
-  content: { padding: 20, paddingBottom: 120 },
   hero: {
     position: "relative",
-    backgroundColor: "#fffaf4",
+    backgroundColor: colors.surface,
     borderRadius: 28,
     padding: 22,
     borderWidth: 1,
-    borderColor: "#eadfce",
-    shadowColor: "#7a5c3d",
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
     shadowOffset: {
       width: 0,
       height: 14,
@@ -161,9 +160,9 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 6,
   },
-  title: { color: "#1f1a17", fontSize: 30, fontWeight: "800", marginBottom: 8 },
+  title: { color: colors.textStrong, fontSize: 30, fontWeight: "800", marginBottom: 8 },
   heroText: {
-    color: "#67594d",
+    color: colors.textSubtle,
     fontSize: 15,
     lineHeight: 22,
     maxWidth: "80%",
@@ -175,11 +174,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 10,
   },
-  sectionTitle: { fontSize: 18, fontWeight: "700", color: "#201c19", marginBottom: 10 },
-  sectionAction: { fontSize: 14, fontWeight: "700", color: "#9d5c2f" },
+  sectionTitle: { fontSize: 18, fontWeight: "700", color: colors.text, marginBottom: 10 },
+  sectionAction: { fontSize: 14, fontWeight: "700", color: colors.link },
   primaryCard: {
     marginTop: 18,
-    backgroundColor: "#2f5d50",
+    backgroundColor: colors.primary,
     borderRadius: 22,
     padding: 18,
   },
@@ -204,7 +203,6 @@ const styles = StyleSheet.create({
     fontWeight: "300",
     lineHeight: 32,
   },
-  pressed: { opacity: 0.85 },
   statsRow: { flexDirection: "row", gap: 10 },
   statCard: {
     flex: 1,
@@ -212,25 +210,25 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: "#eadfce",
+    borderColor: colors.border,
   },
   statCardWarm: {
-    backgroundColor: "#fffaf4",
+    backgroundColor: colors.surface,
   },
   statCardCool: {
-    backgroundColor: "#fffaf4",
+    backgroundColor: colors.surface,
   },
   statCardNeutral: {
-    backgroundColor: "#fffaf4",
+    backgroundColor: colors.surface,
   },
   statValue: { fontSize: 24, fontWeight: "800", color: "#241f1c" },
-  statLabel: { marginTop: 5, fontSize: 12, color: "#6f6258" },
+  statLabel: { marginTop: 5, fontSize: 12, color: colors.textMuted },
   activityCard: {
-    backgroundColor: "#fffaf4",
+    backgroundColor: colors.surface,
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#eadfce",
+    borderColor: colors.border,
     marginBottom: 10,
   },
   activityHeader: { marginBottom: 8 },
@@ -246,6 +244,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   activityTitle: { color: "#241f1c", fontSize: 16, fontWeight: "700", marginBottom: 4 },
-  activityText: { color: "#67594d", fontSize: 14, lineHeight: 20 },
+  activityText: { color: colors.textSubtle, fontSize: 14, lineHeight: 20 },
   activityMeta: { color: "#4e6258", fontSize: 12, fontWeight: "600", marginTop: 8 },
 });

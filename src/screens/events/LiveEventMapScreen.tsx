@@ -12,6 +12,7 @@ import {
   type LiveEventParticipant,
 } from "../../data/eventLiveLocation";
 import { supabase } from "../../supabase";
+import { colors, commonStyles } from "../../styles/common";
 
 type Props = NativeStackScreenProps<RootStackParamList, "LiveEventMap">;
 
@@ -134,24 +135,24 @@ export default function LiveEventMapScreen({ route }: Props) {
   if (loading) {
     return (
       <View style={styles.stateScreen}>
-        <ActivityIndicator size="large" color="#2f5d50" />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.stateText}>Loading event map...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.heroCard}>
-        <Text style={styles.heroEyebrow}>LIVE MAP</Text>
-        <Text style={styles.heroTitle}>{eventDetails?.title ?? eventTitle}</Text>
-        <Text style={styles.heroText}>
+    <ScrollView style={commonStyles.screen} contentContainerStyle={commonStyles.scrollContent}>
+      <View style={commonStyles.heroCard}>
+        <Text style={commonStyles.heroEyebrow}>LIVE MAP</Text>
+        <Text style={commonStyles.heroTitle}>{eventDetails?.title ?? eventTitle}</Text>
+        <Text style={commonStyles.heroSubtitle}>
           {eventDetails?.locationLabel ?? "Location not set"}
         </Text>
       </View>
 
       {error ? (
-        <View style={styles.errorCard}>
+        <View style={commonStyles.errorCard}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
@@ -254,7 +255,7 @@ function formatParticipantStatus(participant: LiveEventParticipant, eventDetails
     : "Live";
   const distanceLabel = getDistanceLabel(participant, eventDetails);
 
-  return distanceLabel ? `${updatedLabel} • ${distanceLabel}` : updatedLabel;
+  return distanceLabel ? `${updatedLabel} - ${distanceLabel}` : updatedLabel;
 }
 
 function getDistanceLabel(participant: LiveEventParticipant, eventDetails: EventMapDetails | null) {
@@ -293,85 +294,38 @@ function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f7f1e8",
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 120,
-  },
   stateScreen: {
     flex: 1,
-    backgroundColor: "#f7f1e8",
+    backgroundColor: colors.background,
     alignItems: "center",
     justifyContent: "center",
     padding: 20,
   },
   stateText: {
     marginTop: 12,
-    color: "#6f6258",
+    color: colors.textMuted,
     fontSize: 14,
   },
-  heroCard: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 28,
-    padding: 22,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    shadowColor: "#7a5c3d",
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 14 },
-    elevation: 6,
-  },
-  heroEyebrow: {
-    color: "#8a6a4a",
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 1,
-  },
-  heroTitle: {
-    color: "#1f1a17",
-    fontSize: 28,
-    fontWeight: "800",
-    marginTop: 8,
-  },
-  heroText: {
-    color: "#67594d",
-    marginTop: 8,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  errorCard: {
-    backgroundColor: "#fff4f1",
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#efd6cf",
-    padding: 14,
-    marginBottom: 12,
-  },
   errorText: {
-    color: "#a23d3d",
+    color: colors.danger,
     fontSize: 13,
     fontWeight: "600",
   },
   infoCard: {
-    backgroundColor: "#fffaf4",
+    backgroundColor: colors.surface,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: "#eadfce",
+    borderColor: colors.border,
     padding: 14,
     marginBottom: 12,
   },
   infoTitle: {
-    color: "#201c19",
+    color: colors.text,
     fontSize: 16,
     fontWeight: "800",
   },
   infoText: {
-    color: "#67594d",
+    color: colors.textSubtle,
     fontSize: 14,
     lineHeight: 20,
     marginTop: 6,
@@ -382,7 +336,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#eadfce",
+    borderColor: colors.border,
   },
   map: {
     flex: 1,
@@ -434,20 +388,20 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   participantsCard: {
-    backgroundColor: "#fffaf4",
+    backgroundColor: colors.surface,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: "#eadfce",
+    borderColor: colors.border,
     padding: 16,
   },
   participantsTitle: {
-    color: "#201c19",
+    color: colors.text,
     fontSize: 16,
     fontWeight: "800",
     marginBottom: 8,
   },
   emptyText: {
-    color: "#6f6258",
+    color: colors.textMuted,
     fontSize: 13,
   },
   participantRow: {
@@ -455,7 +409,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: "#efe4d7",
+    borderTopColor: colors.borderSoft,
   },
   participantAvatar: {
     width: 38,
@@ -481,12 +435,12 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   participantName: {
-    color: "#201c19",
+    color: colors.text,
     fontSize: 14,
     fontWeight: "700",
   },
   participantMeta: {
-    color: "#6f6258",
+    color: colors.textMuted,
     fontSize: 12,
     marginTop: 2,
   },

@@ -5,6 +5,7 @@ import type { RootStackParamList } from "../../../App";
 import ProfileAvatar from "../../components/ProfileAvatar";
 import { fetchCurrentProfile, getProfileInitials, pickAndUploadAvatar, removeAvatar } from "../../profile";
 import { supabase } from "../../supabase";
+import { colors, commonStyles } from "../../styles/common";
 
 type Props = NativeStackScreenProps<RootStackParamList, "EditProfile">;
 
@@ -68,8 +69,8 @@ export default function EditProfileScreen({ navigation, route }: Props) {
       setCurrentUserId(profile.id);
       setForm({
         username: profile.username === "No username found" ? "" : profile.username,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
+        firstName: profile.firstName === "No first name found" ? "" : profile.firstName,
+        lastName: profile.lastName === "No last name found" ? "" : profile.lastName,
         email: profile.email === "No email found" ? "" : profile.email,
         avatarPath: profile.avatarPath,
         avatarUrl: profile.avatarUrl,
@@ -302,21 +303,21 @@ export default function EditProfileScreen({ navigation, route }: Props) {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingState}>
-        <ActivityIndicator size="large" color="#2f5d50" />
+      <View style={commonStyles.loadingState}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <View style={styles.heroCard}>
-        <Text style={styles.heroEyebrow}>Account settings</Text>
-        <Text style={styles.heroTitle}>{highlightedTitle}</Text>
-        <Text style={styles.heroText}>Change your details below and save when you are ready.</Text>
+    <ScrollView style={commonStyles.screen} contentContainerStyle={commonStyles.scrollContent} keyboardShouldPersistTaps="handled">
+      <View style={commonStyles.heroCard}>
+        <Text style={commonStyles.heroEyebrow}>Account settings</Text>
+        <Text style={commonStyles.heroTitle}>{highlightedTitle}</Text>
+        <Text style={commonStyles.heroSubtitle}>Change your details below and save when you are ready.</Text>
       </View>
 
-      <View style={styles.formCard}>
+      <View style={commonStyles.card}>
         <View style={styles.avatarSection}>
           <ProfileAvatar
             avatarUrl={form.avatarUrl}
@@ -330,61 +331,61 @@ export default function EditProfileScreen({ navigation, route }: Props) {
 
         <Text style={styles.sectionTitle}>Profile information</Text>
 
-        <Text style={styles.label}>Username</Text>
+        <Text style={commonStyles.label}>Username</Text>
         <TextInput
           value={form.username}
           onChangeText={(value) => updateField("username", value)}
-          style={[styles.input, initialField === "username" && styles.highlightedInput]}
+          style={[commonStyles.input, initialField === "username" && styles.highlightedInput]}
           autoCapitalize="none"
           autoFocus={initialField === "username"}
           placeholder="Username"
         />
 
-        <Text style={styles.label}>First name</Text>
+        <Text style={commonStyles.label}>First name</Text>
         <TextInput
           value={form.firstName}
           onChangeText={(value) => updateField("firstName", value)}
-          style={[styles.input, initialField === "name" && styles.highlightedInput]}
+          style={[commonStyles.input, initialField === "name" && styles.highlightedInput]}
           autoFocus={initialField === "name"}
           placeholder="First name"
         />
 
-        <Text style={styles.label}>Last name</Text>
+        <Text style={commonStyles.label}>Last name</Text>
         <TextInput
           value={form.lastName}
           onChangeText={(value) => updateField("lastName", value)}
-          style={styles.input}
+          style={commonStyles.input}
           placeholder="Last name"
         />
 
         <Text style={styles.sectionTitle}>Login details</Text>
 
-        <Text style={styles.label}>Email</Text>
+        <Text style={commonStyles.label}>Email</Text>
         <TextInput
           value={form.email}
           onChangeText={(value) => updateField("email", value)}
-          style={[styles.input, initialField === "email" && styles.highlightedInput]}
+          style={[commonStyles.input, initialField === "email" && styles.highlightedInput]}
           autoCapitalize="none"
           keyboardType="email-address"
           autoFocus={initialField === "email"}
           placeholder="name@example.com"
         />
 
-        <Text style={styles.label}>New password</Text>
+        <Text style={commonStyles.label}>New password</Text>
         <TextInput
           value={form.newPassword}
           onChangeText={(value) => updateField("newPassword", value)}
-          style={[styles.input, initialField === "password" && styles.highlightedInput]}
+          style={[commonStyles.input, initialField === "password" && styles.highlightedInput]}
           autoFocus={initialField === "password"}
           secureTextEntry
           placeholder="Leave blank to keep current password"
         />
 
-        <Text style={styles.label}>Confirm new password</Text>
+        <Text style={commonStyles.label}>Confirm new password</Text>
         <TextInput
           value={form.confirmPassword}
           onChangeText={(value) => updateField("confirmPassword", value)}
-          style={styles.input}
+          style={commonStyles.input}
           secureTextEntry
           placeholder="Re-enter new password"
         />
@@ -404,19 +405,19 @@ export default function EditProfileScreen({ navigation, route }: Props) {
           </Text>
         </View>
 
-        {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-        {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
+        {errorMessage ? <Text style={commonStyles.errorText}>{errorMessage}</Text> : null}
+        {successMessage ? <Text style={commonStyles.successText}>{successMessage}</Text> : null}
 
         <Pressable
-          style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
+          style={({ pressed }) => [commonStyles.primaryButton, styles.buttonTop, pressed && commonStyles.pressed]}
           onPress={handleSave}
           disabled={isSaving || isUploadingAvatar}
         >
-          <Text style={styles.primaryButtonText}>{isSaving ? "Saving..." : "Save changes"}</Text>
+          <Text style={commonStyles.primaryButtonText}>{isSaving ? "Saving..." : "Save changes"}</Text>
         </Pressable>
 
-        <Pressable style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]} onPress={() => navigation.goBack()}>
-          <Text style={styles.secondaryButtonText}>Back to profile</Text>
+        <Pressable style={({ pressed }) => [commonStyles.secondaryButton, pressed && commonStyles.pressed]} onPress={() => navigation.goBack()}>
+          <Text style={commonStyles.secondaryButtonText}>Back to profile</Text>
         </Pressable>
       </View>
     </ScrollView>
@@ -424,58 +425,6 @@ export default function EditProfileScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f7f1e8",
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 120,
-  },
-  loadingState: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f7f1e8",
-  },
-  heroCard: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 28,
-    padding: 22,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    shadowColor: "#7a5c3d",
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 6,
-  },
-  heroEyebrow: {
-    color: "#8a6a4a",
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 1,
-  },
-  heroTitle: {
-    color: "#1f1a17",
-    fontSize: 28,
-    fontWeight: "800",
-    marginTop: 8,
-  },
-  heroText: {
-    color: "#67594d",
-    fontSize: 15,
-    lineHeight: 22,
-    marginTop: 8,
-  },
-  formCard: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 24,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-  },
   avatarSection: {
     alignItems: "center",
     marginBottom: 12,
@@ -511,15 +460,15 @@ const styles = StyleSheet.create({
     color: "#201c19",
   },
   highlightedInput: {
-    borderColor: "#2f5d50",
+    borderColor: colors.primary,
     backgroundColor: "#f3f7f1",
   },
   requirements: {
     marginTop: 14,
     borderRadius: 14,
-    backgroundColor: "#f6eee4",
+    backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
-    borderColor: "#eadfce",
+    borderColor: colors.border,
     padding: 12,
   },
   requirementText: {
@@ -528,54 +477,10 @@ const styles = StyleSheet.create({
     marginVertical: 2,
   },
   requirementMet: {
-    color: "#2f5d50",
+    color: colors.primary,
     fontWeight: "700",
   },
-  error: {
-    color: "#c53535",
-    marginTop: 12,
-    fontSize: 14,
-    backgroundColor: "#fff4f1",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  success: {
-    color: "#2f5d50",
-    marginTop: 12,
-    fontSize: 14,
-    backgroundColor: "#eef3e8",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  primaryButton: {
+  buttonTop: {
     marginTop: 18,
-    borderRadius: 16,
-    backgroundColor: "#2f5d50",
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontWeight: "800",
-    fontSize: 16,
-  },
-  secondaryButton: {
-    marginTop: 10,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    backgroundColor: "#f6eee4",
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  secondaryButtonText: {
-    color: "#4f4339",
-    fontWeight: "800",
-    fontSize: 16,
-  },
-  pressed: {
-    opacity: 0.85,
   },
 });

@@ -14,6 +14,7 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { EventInvitee, RootStackParamList } from "../../../App";
 import StepIndicator from "../../components/StepIndicator";
 import { supabase } from "../../supabase";
+import { colors, commonStyles } from "../../styles/common";
 
 type Props = NativeStackScreenProps<RootStackParamList, "CreateEventInvite">;
 
@@ -388,25 +389,25 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={commonStyles.screen}
       behavior="padding"
       keyboardVerticalOffset={96}
     >
       <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.content}
+        style={commonStyles.screen}
+        contentContainerStyle={commonStyles.scrollContent}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
         <StepIndicator step={3} total={attendanceCountingEnabled ? 4 : 3} label="Finalize" />
 
-        <View style={styles.heroCard}>
-          <Text style={styles.title}>Review everything before you create it</Text>
-          <Text style={styles.heroText}>Set visibility, invitations, and preferences, then publish when it looks right.</Text>
+        <View style={commonStyles.heroCard}>
+          <Text style={commonStyles.heroTitle}>Review everything before you create it</Text>
+          <Text style={commonStyles.heroSubtitle}>Set visibility, invitations, and preferences, then publish when it looks right.</Text>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Event summary</Text>
+        <View style={commonStyles.card}>
+          <Text style={commonStyles.cardTitle}>Event summary</Text>
           <Text style={styles.cardText}>Title: {eventName}</Text>
           {eventDescription?.trim() ? <Text style={styles.cardText}>Description: {eventDescription}</Text> : null}
           <Text style={styles.cardText}>Location: {locationLabel}</Text>
@@ -415,8 +416,8 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
           <Text style={styles.cardText}>End: {eventEndTimeLabel}</Text>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Event settings</Text>
+        <View style={commonStyles.card}>
+          <Text style={commonStyles.cardTitle}>Event settings</Text>
 
           <Text style={styles.settingLabel}>Visibility</Text>
           <View style={styles.toggleRow}>
@@ -484,14 +485,14 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
                 }
               }}
               trackColor={{ false: "#d8c7b3", true: "#b8d2c4" }}
-              thumbColor={liveMapEnabled ? "#2f5d50" : "#fffaf4"}
+              thumbColor={liveMapEnabled ? colors.primary : colors.surface}
             />
           </View>
 
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Invite people</Text>
+        <View style={commonStyles.card}>
+          <Text style={commonStyles.cardTitle}>Invite people</Text>
           <View style={styles.inviteRow}>
             <TextInput
               value={inviteInput}
@@ -507,8 +508,8 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
               <Text style={styles.addBtnText}>{addingInvitee ? "Checking..." : "Add"}</Text>
             </Pressable>
           </View>
-          {inviteError ? <Text style={styles.errorText}>{inviteError}</Text> : null}
-          {inviteSuccess ? <Text style={styles.successText}>{inviteSuccess}</Text> : null}
+          {inviteError ? <Text style={commonStyles.errorText}>{inviteError}</Text> : null}
+          {inviteSuccess ? <Text style={commonStyles.successText}>{inviteSuccess}</Text> : null}
 
           {invitedPeople.length > 0 ? (
             <View style={styles.chipsWrap}>
@@ -561,15 +562,15 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
           </View>
         </View>
 
-        {createEventError ? <Text style={styles.errorText}>{createEventError}</Text> : null}
-        {createEventSuccess ? <Text style={styles.successText}>{createEventSuccess}</Text> : null}
+        {createEventError ? <Text style={commonStyles.errorText}>{createEventError}</Text> : null}
+        {createEventSuccess ? <Text style={commonStyles.successText}>{createEventSuccess}</Text> : null}
 
         <Pressable
-          style={[styles.primaryBtn, creatingEvent && styles.primaryBtnDisabled]}
+          style={[commonStyles.primaryButton, creatingEvent && styles.primaryBtnDisabled]}
           onPress={attendanceCountingEnabled ? continueWithAttendanceSetup : handleCreateEvent}
           disabled={creatingEvent}
         >
-          <Text style={styles.primaryBtnText}>
+          <Text style={commonStyles.primaryButtonText}>
             {creatingEvent
               ? "Creating..."
               : attendanceCountingEnabled
@@ -585,32 +586,6 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f7f1e8" },
-  content: { padding: 20, paddingBottom: 120 },
-  heroCard: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 28,
-    padding: 22,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    shadowColor: "#7a5c3d",
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 6,
-  },
-  title: { fontSize: 28, fontWeight: "800", marginBottom: 8, color: "#1f1a17" },
-  heroText: { fontSize: 15, lineHeight: 22, color: "#67594d" },
-  card: {
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    borderRadius: 22,
-    padding: 16,
-    backgroundColor: "#fffaf4",
-    marginBottom: 12,
-  },
-  cardTitle: { fontSize: 18, fontWeight: "700", marginBottom: 10, color: "#201c19" },
   cardText: { fontSize: 14, color: "#5f5145", marginBottom: 6, lineHeight: 20 },
   settingLabel: { fontSize: 14, fontWeight: "700", color: "#201c19", marginTop: 8, marginBottom: 8 },
   toggleRow: {
@@ -770,33 +745,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   removeChipButtonText: { color: "#4f4339", fontSize: 11, fontWeight: "700" },
-  primaryBtn: {
-    marginTop: 6,
-    paddingVertical: 15,
-    borderRadius: 16,
-    alignItems: "center",
-    backgroundColor: "#2f5d50",
-  },
   primaryBtnDisabled: { opacity: 0.7 },
-  primaryBtnText: { color: "#fff", fontWeight: "800", fontSize: 16 },
-  errorText: {
-    color: "#a23d3d",
-    fontSize: 13,
-    fontWeight: "600",
-    backgroundColor: "#fff4f1",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginTop: 10,
-  },
-  successText: {
-    color: "#2f5d50",
-    fontSize: 13,
-    fontWeight: "600",
-    backgroundColor: "#eef3e8",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginTop: 10,
-  },
 });

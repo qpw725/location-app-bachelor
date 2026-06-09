@@ -7,6 +7,7 @@ import type { EventAttendanceMethod, RootStackParamList } from "../../../App";
 import StepIndicator from "../../components/StepIndicator";
 import { saveEventBehaviorTriggers, type EventTriggerInput } from "../../data/eventRules";
 import { supabase } from "../../supabase";
+import { commonStyles } from "../../styles/common";
 
 type Props = NativeStackScreenProps<RootStackParamList, "CreateEventAttendance">;
 
@@ -335,27 +336,27 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={commonStyles.screen}
       behavior="padding"
       keyboardVerticalOffset={96}
     >
       <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.content}
+        style={commonStyles.screen}
+        contentContainerStyle={commonStyles.scrollContent}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
         <StepIndicator step={4} total={4} label="Behavior" />
 
-        <View style={styles.heroCard}>
-          <Text style={styles.title}>Configure event behavior</Text>
-          <Text style={styles.heroText}>
+        <View style={commonStyles.heroCard}>
+          <Text style={commonStyles.heroTitle}>Configure event behavior</Text>
+          <Text style={commonStyles.heroSubtitle}>
             Choose how this event should react to presence, participant counts, and missing participants.
           </Text>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Presence detection</Text>
+        <View style={commonStyles.card}>
+          <Text style={commonStyles.cardTitle}>Presence detection</Text>
           <View style={styles.optionList}>
             {presenceOptions.map((option) => {
               const isSelected = option.method === selectedMethod;
@@ -388,8 +389,8 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
         </View>
 
         {selectedMethod === "gps_geofence" ? (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Event area</Text>
+          <View style={commonStyles.card}>
+            <Text style={commonStyles.cardTitle}>Event area</Text>
             <Text style={styles.cardText}>Presence rules use this radius around the selected event location.</Text>
             <View style={styles.radiusHeader}>
               <Text style={styles.radiusValue}>{attendanceRadiusMeters} m</Text>
@@ -424,7 +425,7 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
           </View>
         ) : null}
 
-        <View style={styles.card}>
+        <View style={commonStyles.card}>
           <View style={styles.ruleHeader}>
             <Text style={styles.cardTitleNoMargin}>Trigger rules</Text>
             <Text style={styles.ruleCounter}>{enabledRuleCount} selected</Text>
@@ -505,8 +506,8 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
           </View>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Behavior summary</Text>
+        <View style={commonStyles.card}>
+          <Text style={commonStyles.cardTitle}>Behavior summary</Text>
           <Text style={styles.cardText}>{selectedPresenceOption.title}</Text>
           <View style={styles.summaryRow}>
             <View style={styles.summaryDot} />
@@ -524,23 +525,23 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
           ))}
         </View>
 
-        {createEventError ? <Text style={styles.errorText}>{createEventError}</Text> : null}
-        {createEventSuccess ? <Text style={styles.successText}>{createEventSuccess}</Text> : null}
+        {createEventError ? <Text style={commonStyles.errorText}>{createEventError}</Text> : null}
+        {createEventSuccess ? <Text style={commonStyles.successText}>{createEventSuccess}</Text> : null}
 
         <Pressable
-          style={[styles.primaryBtn, creatingEvent && styles.primaryBtnDisabled]}
+          style={[commonStyles.primaryButton, styles.primaryBtnTop, creatingEvent && styles.primaryBtnDisabled]}
           onPress={() => void handleCreateEvent()}
           disabled={creatingEvent}
         >
-          <Text style={styles.primaryBtnText}>
+          <Text style={commonStyles.primaryButtonText}>
             {creatingEvent ? "Creating..." : visibility === "Public" ? "Publish event" : "Create event"}
           </Text>
         </Pressable>
 
         <View style={styles.spacerSmall} />
 
-        <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}>
-          <Text style={styles.backBtnText}>Back</Text>
+        <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [commonStyles.backButton, pressed && commonStyles.pressed]}>
+          <Text style={commonStyles.backButtonText}>Back</Text>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -548,32 +549,6 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f7f1e8" },
-  content: { padding: 20, paddingBottom: 120 },
-  heroCard: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 28,
-    padding: 22,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    shadowColor: "#7a5c3d",
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 6,
-  },
-  title: { fontSize: 28, fontWeight: "800", marginBottom: 8, color: "#1f1a17" },
-  heroText: { fontSize: 15, lineHeight: 22, color: "#67594d" },
-  card: {
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    borderRadius: 22,
-    padding: 16,
-    backgroundColor: "#fffaf4",
-    marginBottom: 12,
-  },
-  cardTitle: { fontSize: 18, fontWeight: "700", marginBottom: 10, color: "#201c19" },
   cardTitleNoMargin: { fontSize: 18, fontWeight: "700", color: "#201c19" },
   cardText: { fontSize: 14, color: "#5f5145", marginBottom: 6, lineHeight: 20 },
   optionList: { gap: 10 },
@@ -785,40 +760,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  primaryBtn: {
+  primaryBtnTop: {
     marginTop: 6,
-    paddingVertical: 15,
-    borderRadius: 16,
-    alignItems: "center",
-    backgroundColor: "#2f5d50",
   },
   primaryBtnDisabled: { opacity: 0.7 },
-  primaryBtnText: { color: "#fff", fontWeight: "800", fontSize: 16 },
-  errorText: {
-    color: "#a23d3d",
-    fontSize: 13,
-    fontWeight: "600",
-    backgroundColor: "#fff4f1",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginTop: 10,
-  },
-  successText: {
-    color: "#2f5d50",
-    fontSize: 13,
-    fontWeight: "600",
-    backgroundColor: "#eef3e8",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginTop: 10,
-  },
   spacerSmall: { height: 10 },
-  backBtn: {
-    alignItems: "center",
-    paddingVertical: 8,
-  },
-  backBtnText: { fontSize: 14, color: "#4f4339", fontWeight: "700" },
   pressed: { opacity: 0.86 },
 });

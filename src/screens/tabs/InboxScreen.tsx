@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, ActivityIndicator, RefreshControl, Modal } from "react-native";
 import { supabase } from "../../supabase";
+import { commonStyles } from "../../styles/common";
 
 type InboxItemStatus = "pending" | "accepted" | "declined";
 
@@ -677,22 +678,22 @@ export default function InboxScreen() {
 
   return (
     <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
+      style={commonStyles.screen}
+      contentContainerStyle={commonStyles.scrollContent}
       alwaysBounceVertical
       overScrollMode="always"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} />}
     >
-      <View style={styles.hero}>
-        <Text style={styles.heroEyebrow}>Inbox</Text>
-        <Text style={styles.heroTitle}>Keep up with everything new</Text>
-        <Text style={styles.heroSubtitle}>
+      <View style={commonStyles.heroCard}>
+        <Text style={commonStyles.heroEyebrow}>Inbox</Text>
+        <Text style={commonStyles.heroTitle}>Keep up with everything new</Text>
+        <Text style={commonStyles.heroSubtitle}>
           {pendingEventInvites.length + pendingFriendRequests.length} actions waiting across invites and friend requests.
         </Text>
       </View>
 
-      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-      {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
+      {errorMessage ? <Text style={commonStyles.errorText}>{errorMessage}</Text> : null}
+      {successMessage ? <Text style={commonStyles.successText}>{successMessage}</Text> : null}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Event Invites</Text>
@@ -873,33 +874,6 @@ export default function InboxScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f7f1e8" },
-  content: { padding: 20, paddingBottom: 120 },
-  hero: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 28,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    shadowColor: "#7a5c3d",
-    shadowOffset: {
-      width: 0,
-      height: 14,
-    },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 6,
-    marginBottom: 20,
-  },
-  heroEyebrow: {
-    color: "#8a6a4a",
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 1,
-    marginBottom: 6,
-  },
-  heroTitle: { color: "#1f1a17", fontSize: 28, fontWeight: "800", marginBottom: 8 },
-  heroSubtitle: { color: "#67594d", fontSize: 15, lineHeight: 22 },
   section: { marginBottom: 18 },
   sectionTitle: { fontSize: 20, fontWeight: "700", color: "#201c19", marginBottom: 10 },
   inviteCard: {
@@ -1010,26 +984,6 @@ const styles = StyleSheet.create({
     borderColor: "#eadfce",
     padding: 14,
     alignItems: "center",
-  },
-  errorText: {
-    marginBottom: 10,
-    borderRadius: 12,
-    backgroundColor: "#fff4f1",
-    color: "#a23d3d",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  successText: {
-    marginBottom: 10,
-    borderRadius: 12,
-    backgroundColor: "#eef3e8",
-    color: "#2f5d50",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    fontWeight: "600",
   },
   modalBackdrop: {
     flex: 1,

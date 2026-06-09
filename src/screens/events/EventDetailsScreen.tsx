@@ -14,6 +14,7 @@ import {
 import { deleteHostedEvent, fetchEventBuckets, leaveEvent, type EventItem } from "../../data/eventStore";
 import { getProfileInitials } from "../../profile";
 import { supabase } from "../../supabase";
+import { commonStyles } from "../../styles/common";
 
 type Props = NativeStackScreenProps<RootStackParamList, "EventDetails">;
 
@@ -238,16 +239,16 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={commonStyles.screen} contentContainerStyle={commonStyles.scrollContent}>
       {loading ? (
-        <View style={styles.stateCard}>
+        <View style={commonStyles.stateCard}>
           <ActivityIndicator size="small" />
-          <Text style={styles.stateText}>Loading event details...</Text>
+          <Text style={commonStyles.stateText}>Loading event details...</Text>
         </View>
       ) : null}
 
       {error ? (
-        <View style={styles.errorCard}>
+        <View style={commonStyles.errorCard}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
@@ -298,7 +299,7 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
           ) : null}
 
           {event.attendanceEnabled && runtimeStatus?.canShowLiveState ? (
-            <View style={styles.card}>
+            <View style={commonStyles.card}>
               <Text style={styles.sectionTitle}>Your presence</Text>
               <PersonalPresenceCard presence={runtimeStatus.viewerPresence} eventEnded={runtimeStatus.status === "ended"} />
             </View>
@@ -325,7 +326,7 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
             </View>
           </View>
 
-          <View style={styles.card}>
+          <View style={commonStyles.card}>
             <InfoRow label="When" value={event.time} />
             <InfoRow label="Location" value={event.place} />
             <InfoRow label="Hosted by" value={event.host} />
@@ -333,7 +334,7 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
           </View>
 
           {source === "hosting" && event.attendanceEnabled && runtimeStatus?.canShowLiveState ? (
-            <View style={styles.card}>
+            <View style={commonStyles.card}>
               <View style={styles.sectionHeaderRow}>
                 <Text style={styles.sectionTitleNoMargin}>Attendance</Text>
                 <Text style={styles.sectionCount}>{runtimeStatus.presentCount}/{runtimeStatus.acceptedCount} present</Text>
@@ -342,13 +343,13 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
             </View>
           ) : null}
 
-          <View style={styles.card}>
+          <View style={commonStyles.card}>
             <Text style={styles.sectionTitle}>Invited people</Text>
             <EventInviteStatusSection eventId={event.id} />
           </View>
 
           {source === "hosting" && event.attendanceEnabled && runtimeStatus?.canShowLiveState ? (
-            <View style={styles.card}>
+            <View style={commonStyles.card}>
               <Text style={styles.sectionTitle}>Missing accepted participants</Text>
               <PresenceExceptionList
                 people={runtimeStatus.missingParticipants}
@@ -360,7 +361,7 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
           ) : null}
 
           {source === "hosting" && event.attendanceEnabled && runtimeStatus?.canShowLiveState ? (
-            <View style={styles.card}>
+            <View style={commonStyles.card}>
               <Text style={styles.sectionTitle}>Left or inactive location</Text>
               <PresenceExceptionList
                 people={runtimeStatus.leftParticipants}
@@ -702,8 +703,6 @@ function getStatusCardStyle(severity: EventRuntimeSeverity | undefined) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f7f1e8" },
-  content: { padding: 20, paddingBottom: 120 },
   hero: {
     backgroundColor: "#fffaf4",
     borderRadius: 28,
@@ -798,14 +797,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     lineHeight: 18,
     marginTop: 10,
-  },
-  card: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    padding: 16,
-    marginBottom: 12,
   },
   sectionTitle: { fontSize: 18, fontWeight: "800", color: "#201c19", marginBottom: 10 },
   sectionHeaderRow: {
@@ -1045,25 +1036,5 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   dangerButtonText: { color: "#a23d3d", fontSize: 13, fontWeight: "800" },
-  stateCard: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    padding: 14,
-    marginBottom: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  stateText: { color: "#6f6258", fontSize: 13 },
-  errorCard: {
-    backgroundColor: "#fff4f1",
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#efd6cf",
-    padding: 14,
-    marginBottom: 12,
-  },
   errorText: { color: "#a23d3d", fontSize: 13, fontWeight: "600" },
 });

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { colors, commonStyles } from "../../styles/common";
 
 type AuthStackParamList = {
   Login: undefined;
@@ -55,45 +56,45 @@ export default function RegisterScreen({ navigation }: Props) {
 
   return (
     <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
+      style={commonStyles.screen}
+      contentContainerStyle={commonStyles.centeredContent}
       keyboardShouldPersistTaps="handled"
       alwaysBounceVertical
       overScrollMode="always"
     >
-      <View style={styles.heroCard}>
-        <Text style={styles.heroEyebrow}>Create account</Text>
-        <Text style={styles.title}>Set up your login details</Text>
-        <Text style={styles.subtitle}>Step 1 of 2</Text>
+      <View style={commonStyles.heroCard}>
+        <Text style={commonStyles.heroEyebrow}>Create account</Text>
+        <Text style={commonStyles.heroTitle}>Set up your login details</Text>
+        <Text style={commonStyles.heroSubtitle}>Step 1 of 2</Text>
       </View>
 
-      <View style={styles.formCard}>
-        <Text style={styles.label}>Email</Text>
+      <View style={commonStyles.card}>
+        <Text style={commonStyles.label}>Email</Text>
         <TextInput
           value={email}
           onChangeText={setEmail}
-          style={styles.input}
+          style={commonStyles.input}
           autoCapitalize="none"
           keyboardType="email-address"
           placeholder="name@example.com"
           placeholderTextColor="#8a7f74"
         />
 
-        <Text style={styles.label}>Password</Text>
+        <Text style={commonStyles.label}>Password</Text>
         <TextInput
           value={password}
           onChangeText={setPassword}
-          style={styles.input}
+          style={commonStyles.input}
           secureTextEntry
           placeholder="At least 8 characters"
           placeholderTextColor="#8a7f74"
         />
 
-        <Text style={styles.label}>Re-enter password</Text>
+        <Text style={commonStyles.label}>Re-enter password</Text>
         <TextInput
           value={confirmPassword}
           onChangeText={setConfirmPassword}
-          style={styles.input}
+          style={commonStyles.input}
           secureTextEntry
           placeholder="Re-enter password"
           placeholderTextColor="#8a7f74"
@@ -107,10 +108,10 @@ export default function RegisterScreen({ navigation }: Props) {
           <Text style={[styles.requirementItem, passwordsMatch && confirmPassword.length > 0 && styles.requirementMet]}>- Passwords match</Text>
         </View>
 
-        {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+        {errorMessage ? <Text style={commonStyles.errorText}>{errorMessage}</Text> : null}
 
-        <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]} onPress={handleContinue}>
-          <Text style={styles.primaryButtonText}>Continue</Text>
+        <Pressable style={({ pressed }) => [commonStyles.primaryButton, pressed && commonStyles.pressed]} onPress={handleContinue}>
+          <Text style={commonStyles.primaryButtonText}>Continue</Text>
         </Pressable>
       </View>
     </ScrollView>
@@ -118,60 +119,10 @@ export default function RegisterScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f7f1e8",
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 40,
-    flexGrow: 1,
-    justifyContent: "center",
-  },
-  heroCard: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 28,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    shadowColor: "#7a5c3d",
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 14 },
-    elevation: 6,
-    marginBottom: 16,
-  },
-  heroEyebrow: {
-    color: "#8a6a4a",
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  title: { fontSize: 30, fontWeight: "800", color: "#1f1a17" },
-  subtitle: { marginTop: 8, fontSize: 15, color: "#67594d", lineHeight: 22 },
-  formCard: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    padding: 18,
-  },
-  label: { marginBottom: 6, marginTop: 10, fontSize: 14, color: "#201c19", fontWeight: "700" },
-  input: {
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    borderRadius: 14,
-    backgroundColor: "#fffaf4",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: "#201c19",
-  },
   requirements: {
     marginTop: 10,
-    backgroundColor: "#fff6ea",
-    borderColor: "#eadfce",
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
     borderWidth: 1,
     borderRadius: 16,
     paddingHorizontal: 12,
@@ -179,22 +130,4 @@ const styles = StyleSheet.create({
   },
   requirementItem: { color: "#6f6258", fontSize: 13, marginVertical: 2 },
   requirementMet: { color: "#2f7d32", fontWeight: "600" },
-  error: {
-    color: "#c53535",
-    marginTop: 10,
-    fontSize: 14,
-    backgroundColor: "#fff4f1",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  primaryButton: {
-    marginTop: 18,
-    borderRadius: 16,
-    backgroundColor: "#2f5d50",
-    paddingVertical: 15,
-    alignItems: "center",
-  },
-  primaryButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  pressed: { opacity: 0.85 },
 });

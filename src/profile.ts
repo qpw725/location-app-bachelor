@@ -47,13 +47,9 @@ export async function fetchCurrentProfile(): Promise<{ profile: CurrentProfile |
     return { profile: null, error: profileError.message };
   }
 
-  const metadata = user.user_metadata as
-    | { username?: string; first_name?: string; last_name?: string }
-    | undefined;
-
-  const firstName = profileRow?.first_name?.trim() || metadata?.first_name?.trim() || "";
-  const lastName = profileRow?.last_name?.trim() || metadata?.last_name?.trim() || "";
-  const username = profileRow?.username?.trim() || metadata?.username?.trim() || "";
+  const firstName = profileRow?.first_name?.trim() || "";
+  const lastName = profileRow?.last_name?.trim() || "";
+  const username = profileRow?.username?.trim() || "";
   const fullName = `${firstName} ${lastName}`.trim();
   const createdAt = user.created_at ? new Date(user.created_at) : null;
   const memberSince =
@@ -67,8 +63,8 @@ export async function fetchCurrentProfile(): Promise<{ profile: CurrentProfile |
       id: user.id,
       email: user.email?.trim() ?? "No email found",
       username: username || "No username found",
-      firstName: firstName || "",
-      lastName: lastName || "",
+      firstName: firstName || "No first name found",
+      lastName: lastName || "No last name found",
       fullName: fullName || "No name found",
       memberSince,
       avatarPath,

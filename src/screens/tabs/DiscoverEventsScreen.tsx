@@ -16,6 +16,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import type { MainTabParamList } from "../../../App";
 import EventAttendeeSection from "../../components/EventAttendeeSection";
 import { fetchEventBuckets, joinPublicEvent, type EventItem } from "../../data/eventStore";
+import { colors, commonStyles } from "../../styles/common";
 
 type Props = BottomTabScreenProps<MainTabParamList, "DiscoverEvents">;
 
@@ -52,7 +53,7 @@ function PublicEventCard({
   joining: boolean;
 }) {
   return (
-    <View style={styles.discoverCard}>
+    <View style={commonStyles.card}>
       <Text style={styles.eventTitle}>{title}</Text>
       <Text style={styles.eventDescription} numberOfLines={3}>{description}</Text>
       <Text style={styles.eventMeta}>{time}</Text>
@@ -248,25 +249,25 @@ export default function DiscoverEventsScreen(_props: Props) {
 
   return (
     <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
+      style={commonStyles.screen}
+      contentContainerStyle={commonStyles.scrollContent}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
     >
-      <View style={styles.hero}>
-        <Text style={styles.heroEyebrow}>Discover</Text>
-        <Text style={styles.heroTitle}>Find public events</Text>
-        <Text style={styles.heroSubtitle}>Search nearby plans, filter by mood, and join the ones that fit your day.</Text>
+      <View style={commonStyles.heroCard}>
+        <Text style={commonStyles.heroEyebrow}>Discover</Text>
+        <Text style={commonStyles.heroTitle}>Find public events</Text>
+        <Text style={commonStyles.heroSubtitle}>Search nearby plans, filter by mood, and join the ones that fit your day.</Text>
       </View>
 
       {loadingEvents ? (
-        <View style={styles.stateCard}>
+        <View style={commonStyles.stateCard}>
           <ActivityIndicator size="small" />
-          <Text style={styles.stateText}>Loading events...</Text>
+          <Text style={commonStyles.stateText}>Loading events...</Text>
         </View>
       ) : null}
 
       {eventsError ? (
-        <View style={styles.errorCard}>
+        <View style={commonStyles.errorCard}>
           <Text style={styles.errorText}>{eventsError}</Text>
         </View>
       ) : null}
@@ -314,9 +315,9 @@ export default function DiscoverEventsScreen(_props: Props) {
             maximumValue={MAX_DISTANCE_KM}
             step={1}
             value={distanceFilterKm}
-            minimumTrackTintColor="#2f5d50"
-            maximumTrackTintColor="#efe4d7"
-            thumbTintColor="#2f5d50"
+            minimumTrackTintColor={colors.primary}
+            maximumTrackTintColor={colors.borderSoft}
+            thumbTintColor={colors.primary}
             onSlidingStart={() => {
               if (!userLocation) {
                 void loadUserLocation(true);
@@ -349,7 +350,7 @@ export default function DiscoverEventsScreen(_props: Props) {
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>Public events</Text>
+      <Text style={commonStyles.sectionTitle}>Public events</Text>
       {discoverList.map((event) => (
         <PublicEventCard
           key={event.id}
@@ -361,7 +362,7 @@ export default function DiscoverEventsScreen(_props: Props) {
         />
       ))}
       {discoverList.length === 0 && (
-        <View style={styles.discoverCard}>
+        <View style={commonStyles.card}>
           <Text style={styles.eventTitle}>No events match your filters</Text>
           <Text style={styles.eventMeta}>Try changing search text or filters.</Text>
         </View>
@@ -371,50 +372,22 @@ export default function DiscoverEventsScreen(_props: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f7f1e8" },
-  content: { padding: 20, paddingBottom: 120 },
-  hero: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 28,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    shadowColor: "#7a5c3d",
-    shadowOffset: {
-      width: 0,
-      height: 14,
-    },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 6,
-    marginBottom: 24,
-  },
-  heroEyebrow: {
-    color: "#8a6a4a",
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 1,
-    marginBottom: 6,
-  },
-  heroTitle: { color: "#1f1a17", fontSize: 28, fontWeight: "800", marginBottom: 8 },
-  heroSubtitle: { color: "#67594d", fontSize: 15, lineHeight: 22, maxWidth: "92%" },
-  sectionTitle: { fontSize: 20, fontWeight: "700", color: "#201c19", marginBottom: 10 },
   searchInput: {
-    backgroundColor: "#fffaf4",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#eadfce",
+    borderColor: colors.border,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    color: "#201c19",
+    color: colors.text,
     marginBottom: 12,
   },
   filterBlock: {
-    backgroundColor: "#fffaf4",
+    backgroundColor: colors.surface,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#eadfce",
+    borderColor: colors.border,
     padding: 14,
     marginBottom: 12,
   },
@@ -463,21 +436,21 @@ const styles = StyleSheet.create({
   filterHelpText: {
     marginTop: -2,
     marginBottom: 12,
-    color: "#6f6258",
+    color: colors.textMuted,
     fontSize: 12,
     lineHeight: 18,
   },
   filterChip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#eadfce",
-    backgroundColor: "#f6eee4",
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   filterChipActive: {
-    backgroundColor: "#2f5d50",
-    borderColor: "#2f5d50",
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   filterChipText: {
     fontSize: 12,
@@ -488,35 +461,27 @@ const styles = StyleSheet.create({
     color: "#ffffff",
   },
   eventTitle: { fontSize: 16, fontWeight: "700", color: "#241f1c", marginBottom: 4 },
-  eventMeta: { fontSize: 13, color: "#6f6258" },
+  eventMeta: { fontSize: 13, color: colors.textMuted },
   eventDescription: { fontSize: 13, color: "#5f5145", marginBottom: 6, lineHeight: 19 },
-  discoverCard: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    padding: 16,
-    marginBottom: 12,
-  },
   discoverFooter: {
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: "#efe4d7",
+    borderTopColor: colors.borderSoft,
     flexDirection: "row",
     justifyContent: "space-between",
   },
   discoverHost: { fontSize: 12, color: "#4e6258", fontWeight: "600" },
-  discoverVibe: { fontSize: 12, color: "#6f6258" },
+  discoverVibe: { fontSize: 12, color: colors.textMuted },
   discoverActionRow: {
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: "#efe4d7",
+    borderTopColor: colors.borderSoft,
     alignItems: "flex-start",
   },
   joinButton: {
-    backgroundColor: "#2f5d50",
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -528,26 +493,6 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 13,
     fontWeight: "700",
-  },
-  stateCard: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    padding: 14,
-    marginBottom: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  stateText: { color: "#6f6258", fontSize: 13 },
-  errorCard: {
-    backgroundColor: "#fff4f1",
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#efd6cf",
-    padding: 14,
-    marginBottom: 12,
   },
   errorText: { color: "#a23d3d", fontSize: 13, fontWeight: "600" },
 });

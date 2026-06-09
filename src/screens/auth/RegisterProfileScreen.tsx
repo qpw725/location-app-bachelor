@@ -3,6 +3,7 @@ import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/dat
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { getSupabaseDebugInfo, supabase, testSupabaseConnection } from "../../supabase";
+import { colors, commonStyles } from "../../styles/common";
 
 type AuthStackParamList = {
   Login: undefined;
@@ -148,50 +149,50 @@ export default function RegisterProfileScreen({ navigation, route }: Props) {
 
   return (
     <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
+      style={commonStyles.screen}
+      contentContainerStyle={commonStyles.centeredContent}
       keyboardShouldPersistTaps="handled"
       alwaysBounceVertical
       overScrollMode="always"
     >
-      <View style={styles.heroCard}>
-        <Text style={styles.heroEyebrow}>Create account</Text>
-        <Text style={styles.title}>Add the details for your profile</Text>
-        <Text style={styles.subtitle}>Step 2 of 2</Text>
+      <View style={commonStyles.heroCard}>
+        <Text style={commonStyles.heroEyebrow}>Create account</Text>
+        <Text style={commonStyles.heroTitle}>Add the details for your profile</Text>
+        <Text style={commonStyles.heroSubtitle}>Step 2 of 2</Text>
       </View>
 
-      <View style={styles.formCard}>
+      <View style={commonStyles.card}>
         <Text style={styles.emailPill}>Email: {email}</Text>
 
-        <Text style={styles.label}>Username</Text>
+        <Text style={commonStyles.label}>Username</Text>
         <TextInput
           value={username}
           onChangeText={setUsername}
-          style={styles.input}
+          style={commonStyles.input}
           autoCapitalize="none"
           placeholder="Username"
           placeholderTextColor="#8a7f74"
         />
 
-        <Text style={styles.label}>First name</Text>
+        <Text style={commonStyles.label}>First name</Text>
         <TextInput
           value={firstName}
           onChangeText={setFirstName}
-          style={styles.input}
+          style={commonStyles.input}
           placeholder="First name"
           placeholderTextColor="#8a7f74"
         />
 
-        <Text style={styles.label}>Last name</Text>
+        <Text style={commonStyles.label}>Last name</Text>
         <TextInput
           value={lastName}
           onChangeText={setLastName}
-          style={styles.input}
+          style={commonStyles.input}
           placeholder="Last name"
           placeholderTextColor="#8a7f74"
         />
 
-        <Text style={styles.label}>Date of birth</Text>
+        <Text style={commonStyles.label}>Date of birth</Text>
         <View style={styles.iosPickerWrap}>
           <DateTimePicker
             value={dateOfBirth}
@@ -202,20 +203,20 @@ export default function RegisterProfileScreen({ navigation, route }: Props) {
           />
         </View>
 
-        {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-        {message ? <Text style={styles.success}>{message}</Text> : null}
+        {errorMessage ? <Text style={commonStyles.errorText}>{errorMessage}</Text> : null}
+        {message ? <Text style={commonStyles.successText}>{message}</Text> : null}
         {connectionMessage ? <Text style={styles.info}>{connectionMessage}</Text> : null}
 
-        <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]} onPress={handleRegister} disabled={loading}>
-          <Text style={styles.primaryButtonText}>{loading ? "Creating..." : "Register"}</Text>
+        <Pressable style={({ pressed }) => [commonStyles.primaryButton, styles.buttonTop, pressed && commonStyles.pressed]} onPress={handleRegister} disabled={loading}>
+          <Text style={commonStyles.primaryButtonText}>{loading ? "Creating..." : "Register"}</Text>
         </Pressable>
 
         <Pressable
           onPress={handleConnectionTest}
           disabled={testingConnection}
-          style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+          style={({ pressed }) => [commonStyles.secondaryButton, pressed && commonStyles.pressed]}
         >
-          <Text style={styles.secondaryButtonText}>
+          <Text style={commonStyles.secondaryButtonText}>
             {testingConnection ? "Testing connection..." : "Test Supabase connection"}
           </Text>
         </Pressable>
@@ -225,95 +226,27 @@ export default function RegisterProfileScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f7f1e8",
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 40,
-    flexGrow: 1,
-    justifyContent: "center",
-  },
-  heroCard: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 28,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    shadowColor: "#7a5c3d",
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 14 },
-    elevation: 6,
-    marginBottom: 16,
-  },
-  heroEyebrow: {
-    color: "#8a6a4a",
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  title: { fontSize: 30, fontWeight: "800", color: "#1f1a17" },
-  subtitle: { marginTop: 8, fontSize: 15, color: "#67594d", lineHeight: 22 },
-  formCard: {
-    backgroundColor: "#fffaf4",
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    padding: 18,
-  },
   emailPill: {
     alignSelf: "flex-start",
     marginBottom: 4,
     fontSize: 13,
     color: "#5f5145",
     fontWeight: "700",
-    backgroundColor: "#f6eee4",
+    backgroundColor: colors.surfaceSoft,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: "#eadfce",
-  },
-  label: { marginBottom: 6, marginTop: 10, fontSize: 14, color: "#201c19", fontWeight: "700" },
-  input: {
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    borderRadius: 14,
-    backgroundColor: "#fffaf4",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: "#201c19",
+    borderColor: colors.border,
   },
   iosPickerWrap: {
     borderWidth: 1,
-    borderColor: "#eadfce",
+    borderColor: colors.border,
     borderRadius: 14,
-    backgroundColor: "#fffaf4",
+    backgroundColor: colors.surface,
     paddingVertical: 10,
     paddingHorizontal: 10,
     marginTop: 2,
-  },
-  error: {
-    color: "#c53535",
-    marginTop: 10,
-    fontSize: 14,
-    backgroundColor: "#fff4f1",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  success: {
-    color: "#2f7d32",
-    marginTop: 10,
-    fontSize: 14,
-    backgroundColor: "#eef3e8",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
   },
   info: {
     color: "#2f5d50",
@@ -324,23 +257,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  primaryButton: {
+  buttonTop: {
     marginTop: 18,
-    borderRadius: 16,
-    backgroundColor: "#2f5d50",
-    paddingVertical: 15,
-    alignItems: "center",
   },
-  primaryButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  secondaryButton: {
-    marginTop: 10,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#eadfce",
-    backgroundColor: "#f6eee4",
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  secondaryButtonText: { color: "#4f4339", fontWeight: "700", fontSize: 16 },
-  pressed: { opacity: 0.85 },
 });

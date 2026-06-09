@@ -7,6 +7,7 @@ import type { MainTabParamList, RootStackParamList } from "../../../App";
 import ProfileAvatar from "../../components/ProfileAvatar";
 import { CurrentProfile, fetchCurrentProfile, getProfileInitials, pickAndUploadAvatar, removeAvatar } from "../../profile";
 import { supabase } from "../../supabase";
+import { colors, commonStyles } from "../../styles/common";
 
 type Props = CompositeScreenProps<BottomTabScreenProps<MainTabParamList, "Profile">, NativeStackScreenProps<RootStackParamList>>;
 
@@ -129,9 +130,9 @@ export default function ProfileScreen({ navigation }: Props) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={commonStyles.screen} contentContainerStyle={commonStyles.scrollContent}>
       <View style={styles.heroCard}>
-        <Text style={styles.heroEyebrow}>Profile</Text>
+        <Text style={[commonStyles.heroEyebrow, styles.heroEyebrow]}>Profile</Text>
         <ProfileAvatar
           avatarUrl={profile.avatarUrl}
           initials={initials}
@@ -175,44 +176,36 @@ export default function ProfileScreen({ navigation }: Props) {
           </View>
         </View>
 
-        <Pressable style={({ pressed }) => [styles.editButton, pressed && styles.pressed]} onPress={openEditProfile}>
-          <Text style={styles.editButtonText}>Edit profile</Text>
+        <Pressable style={({ pressed }) => [commonStyles.primaryButton, styles.editButton, pressed && commonStyles.pressed]} onPress={openEditProfile}>
+          <Text style={commonStyles.primaryButtonText}>Edit profile</Text>
         </Pressable>
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Settings</Text>
         <Pressable
-          style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.settingsRow, pressed && commonStyles.pressed]}
           onPress={handleSignOut}
         >
           <Text style={[styles.settingsText, styles.signOutText]}>Log off</Text>
         </Pressable>
       </View>
 
-      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-      {avatarMessage ? <Text style={styles.helperText}>{avatarMessage}</Text> : null}
+      {errorMessage ? <Text style={commonStyles.errorText}>{errorMessage}</Text> : null}
+      {avatarMessage ? <Text style={commonStyles.successText}>{avatarMessage}</Text> : null}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f7f1e8",
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 120,
-  },
   heroCard: {
-    backgroundColor: "#fffaf4",
+    backgroundColor: colors.surface,
     borderRadius: 28,
     padding: 22,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#eadfce",
-    shadowColor: "#7a5c3d",
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.08,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 14 },
@@ -220,14 +213,10 @@ const styles = StyleSheet.create({
   },
   heroEyebrow: {
     alignSelf: "flex-start",
-    color: "#8a6a4a",
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 1,
     marginBottom: 12,
   },
   avatarHint: {
-    color: "#6f6258",
+    color: colors.textMuted,
     marginTop: 10,
     fontSize: 13,
     fontWeight: "600",
@@ -235,12 +224,12 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#1f1a17",
+    color: colors.textStrong,
     textAlign: "center",
   },
   username: {
     fontSize: 16,
-    color: "#67594d",
+    color: colors.textSubtle,
     marginTop: 4,
   },
   heroMetaRow: {
@@ -249,11 +238,11 @@ const styles = StyleSheet.create({
   },
   metaPill: {
     borderRadius: 999,
-    backgroundColor: "#f6eee4",
+    backgroundColor: colors.surfaceSoft,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: "#eadfce",
+    borderColor: colors.border,
   },
   metaPillText: {
     color: "#5f5145",
@@ -266,17 +255,17 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#201c19",
+    color: colors.text,
     marginBottom: 10,
   },
   infoPanel: {
     borderRadius: 22,
-    backgroundColor: "#fffaf4",
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#eadfce",
+    borderColor: colors.border,
     paddingHorizontal: 16,
     paddingVertical: 16,
-    shadowColor: "#7a5c3d",
+    shadowColor: colors.shadow,
     shadowOpacity: 0.05,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
@@ -288,7 +277,7 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 13,
-    color: "#6f6258",
+    color: colors.textMuted,
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 0.5,
@@ -296,31 +285,22 @@ const styles = StyleSheet.create({
   infoValue: {
     marginTop: 5,
     fontSize: 17,
-    color: "#201c19",
+    color: colors.text,
     fontWeight: "700",
   },
   infoDivider: {
     height: 1,
-    backgroundColor: "#efe4d7",
+    backgroundColor: colors.borderSoft,
     marginVertical: 12,
   },
   editButton: {
     marginTop: 12,
-    borderRadius: 18,
-    backgroundColor: "#2f5d50",
-    paddingVertical: 15,
-    alignItems: "center",
-  },
-  editButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "800",
   },
   settingsRow: {
     borderRadius: 22,
-    backgroundColor: "#fffaf4",
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#eadfce",
+    borderColor: colors.border,
     paddingHorizontal: 16,
     paddingVertical: 16,
     flexDirection: "row",
@@ -328,32 +308,11 @@ const styles = StyleSheet.create({
   },
   settingsText: {
     fontSize: 17,
-    color: "#201c19",
+    color: colors.text,
     fontWeight: "700",
     flex: 1,
   },
   signOutText: {
     color: "#b33737",
-  },
-  pressed: {
-    opacity: 0.86,
-  },
-  helperText: {
-    marginTop: 14,
-    fontSize: 14,
-    color: "#2f5d50",
-    backgroundColor: "#eef3e8",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  errorText: {
-    marginTop: 14,
-    fontSize: 14,
-    color: "#c53535",
-    backgroundColor: "#fff4f1",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
   },
 });
