@@ -492,7 +492,7 @@ function AttendanceOverview({
   eventEndAt: Date | null;
 }) {
   const arrivedCount = status.participants.filter((participant) => participant.hasCheckedIn).length;
-  const leftCount = status.participants.filter((participant) => participant.presenceState === "left" || participant.presenceState === "stale").length;
+  const leftCount = status.participants.filter((participant) => participant.presenceState === "left" || participant.presenceState === "inactive").length;
   const notArrivedCount = status.participants.filter((participant) => participant.presenceState === "not_arrived").length;
 
   if (status.participants.length === 0) {
@@ -572,7 +572,7 @@ function getAttendanceStatusModel(participant: EventPresencePerson) {
     return { label: "Left", tone: "warning" as const };
   }
 
-  if (participant.presenceState === "stale") {
+  if (participant.presenceState === "inactive") {
     return { label: "Inactive", tone: "warning" as const };
   }
 
@@ -596,7 +596,7 @@ function getAttendanceTimingLines(participant: EventPresencePerson, eventStartAt
     lines.push(`Left area ${formatShortTime(leftAt)}${isBeforeEventEnd(leftAt, eventEndAt) ? " - before end" : ""}`);
   }
 
-  if (participant.presenceState === "stale" && participant.lastLocationAt) {
+  if (participant.presenceState === "inactive" && participant.lastLocationAt) {
     lines.push(`Location inactive since ${formatShortTime(new Date(participant.lastLocationAt))}`);
   }
 
@@ -674,7 +674,7 @@ function getPersonalPresenceModel(presence: EventPresencePerson | null, eventEnd
     title: eventEnded ? "Location was inactive" : "Location inactive",
     message: eventEnded
       ? "Your last event location update became inactive before the event ended."
-      : "Your last event location update is stale. Keep the app open to refresh your presence.",
+      : "Your event location is inactive. Keep the app open to refresh your presence.",
   };
 }
 

@@ -64,7 +64,8 @@ export async function fetchEventAttendanceCount(eventId: string): Promise<{ coun
   const { count, error } = await supabase
     .from("event_attendance")
     .select("event_id", { count: "exact", head: true })
-    .eq("event_id", eventId);
+    .eq("event_id", eventId)
+    .is("checked_out_at", null);
 
   if (error) {
     return { count: 0, error: error.message };
@@ -311,9 +312,8 @@ function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: numbe
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(toRadians(lat1)) *
-      Math.cos(toRadians(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos(toRadians(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
 
   return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }

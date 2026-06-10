@@ -62,7 +62,7 @@ export type EventPresencePerson = {
   checkedOutAt: string | null;
   lastLocationAt: string | null;
   distanceMeters: number | null;
-  presenceState: "present" | "not_arrived" | "left" | "stale";
+  presenceState: "present" | "not_arrived" | "left" | "inactive";
 };
 
 export type EventRuntimeStatusId =
@@ -376,7 +376,7 @@ function deriveRuntimeStatus(input: {
   const missingParticipants = missingVisible
     ? acceptedParticipants.filter((person) => person.presenceState === "not_arrived")
     : [];
-  const leftParticipants = acceptedParticipants.filter((person) => person.presenceState === "left" || person.presenceState === "stale");
+  const leftParticipants = acceptedParticipants.filter((person) => person.presenceState === "left" || person.presenceState === "inactive");
   const createRuntimeStatus = (status: Omit<EventRuntimeStatus, "participants">) =>
     createStatus(status, acceptedParticipants);
   const isBeforeStart = Number.isFinite(startMs) && now < startMs;
@@ -733,15 +733,15 @@ function getPresenceState(input: {
     return "present";
   }
 
+  if (!input.hasLiveLocation || !input.hasFreshLocation) {
+    return "inactive";
+  }
+
   if (!input.hasCheckedIn) {
     return "not_arrived";
   }
 
-  if (input.hasLiveLocation && input.hasFreshLocation) {
-    return "left";
-  }
-
-  return "stale";
+  return "left";
 }
 
 function hasEventCoordinates(event: EventItem) {
