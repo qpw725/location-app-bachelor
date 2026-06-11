@@ -23,6 +23,10 @@ let isStarted = false;
 const missingReminderEventIds = new Set<string>();
 const capacityWarningEventIds = new Set<string>();
 const endedByHostLeaveEventIds = new Set<string>();
+const hostArrivedReminderEventIds = new Set<string>();
+const hostLeftReminderEventIds = new Set<string>();
+const minimumMissingReminderEventIds = new Set<string>();
+const attendeeCapacityReminderEventIds = new Set<string>();
 
 type PresenceEventSnapshot = {
   activePresenceEvents: EventItem[];
@@ -40,7 +44,32 @@ function dedupeEvents(events: EventItem[]) {
 }
 
 function getEligiblePresenceEvents(events: EventItem[]) {
-  return dedupeEvents(events).filter((event) => canUseGpsAttendance(event) && isEventPresenceWindowOpen(event));
+  return dedupeEvents(events).filter(
+    (event) => (canUseGpsAttendance(event) || canUseLiveMapLocation(event)) && isEventPresenceWindowOpen(event)
+  );
+}
+
+function canUseLiveMapLocation(event: EventItem) {
+  return event.liveMapEnabled && typeof event.latitude === "number" && typeof event.longitude === "number";
+}
+
+async function upsertLiveMapLocation(eventId: string, userId: string, latitude: number, longitude: number) {
+  const { error } = await supabase.from("event_live_locations").upsert(
+    [
+      {
+        event_id: eventId,
+        user_id: userId,
+        latitude,
+        longitude,
+        updated_at: new Date().toISOString(),
+      },
+    ],
+    { onConflict: "event_id,user_id" }
+  );
+
+  if (error) {
+    console.warn(`[EventPresence] Failed to update live map for ${eventId}:`, error.message);
+  }
 }
 
 async function fetchEligiblePresenceEvents(): Promise<PresenceEventSnapshot | null> {
@@ -79,12 +108,16 @@ async function updatePresenceForPosition(latitude: number, longitude: number) {
 
   const events = activeEvents;
   for (const event of events) {
-    const result = await updateGpsPresenceFromCoordinates(event, activeUserId, latitude, longitude);
-    if (result.status === "error") {
-      console.warn(`[EventPresence] Failed to update ${event.id}:`, result.reason);
+    if (canUseGpsAttendance(event)) {
+      const result = await updateGpsPresenceFromCoordinates(event, activeUserId, latitude, longitude);
+      if (result.status === "error") {
+        console.warn(`[EventPresence] Failed to update ${event.id}:`, result.reason);
+      }
+    } else if (canUseLiveMapLocation(event)) {
+      await upsertLiveMapLocation(event.id, activeUserId, latitude, longitude);
     }
 
-    if (event.creatorId === activeUserId) {
+    if (canUseGpsAttendance(event) && event.creatorId === activeUserId) {
       await maybeEndEventAfterHostLeft(event);
     }
   }
@@ -138,9 +171,76 @@ async function maybeNotifyMissingParticipants(events: EventItem[]) {
 
     missingReminderEventIds.add(event.id);
     Alert.alert(
-      "Event started",
-      `"${event.title}" has started, and you are not marked present yet. Keep the app open near the event area so your presence can update.`
+      "You are not present",
+      `You are not marked present for "${event.title}" yet. Keep the app open near the event area so your presence can update.`
     );
+  }
+}
+
+function viewerIsMissingOrInactive(status: NonNullable<Awaited<ReturnType<typeof fetchEventRuntimeStatus>>["data"]>) {
+  return (
+    status.viewerPresence?.presenceState === "not_arrived" ||
+    status.viewerPresence?.presenceState === "inactive"
+  );
+}
+
+async function maybeNotifyAttendeeEventRules(events: EventItem[]) {
+  if (!activeUserId) {
+    return;
+  }
+
+  const eligibleEvents = getEligiblePresenceEvents(events);
+  for (const event of eligibleEvents) {
+    const { data: status, error } = await fetchEventRuntimeStatus({ event, viewerRole: "attending" });
+    if (error || !status) {
+      if (error) {
+        console.warn(`[EventPresence] Could not evaluate attendee rule notifications for ${event.id}:`, error);
+      }
+      continue;
+    }
+
+    if (
+      status.hostPresenceRequired &&
+      status.hostPresent &&
+      !status.viewerPresence?.isHost &&
+      !hostArrivedReminderEventIds.has(event.id)
+    ) {
+      hostArrivedReminderEventIds.add(event.id);
+      Alert.alert("Host arrived", `The host has arrived to "${event.title}", and the event may now begin properly.`);
+    }
+
+    if (
+      status.endedByHostLeaving &&
+      viewerIsMissingOrInactive(status) &&
+      !hostLeftReminderEventIds.has(event.id)
+    ) {
+      hostLeftReminderEventIds.add(event.id);
+      Alert.alert("Event ended", `"${event.title}" has now ended because the host left the event area.`);
+    }
+
+    const startMs = event.startAt?.getTime() ?? NaN;
+    const hasStarted = !Number.isFinite(startMs) || Date.now() >= startMs;
+    if (
+      hasStarted &&
+      status.status === "not_enough_participants" &&
+      viewerIsMissingOrInactive(status) &&
+      !minimumMissingReminderEventIds.has(event.id)
+    ) {
+      minimumMissingReminderEventIds.add(event.id);
+      Alert.alert(
+        "Not enough participants",
+        `You are not present for "${event.title}" yet. Please go there, because there are not enough participants present.`
+      );
+    }
+
+    if (
+      status.status === "event_full" &&
+      viewerIsMissingOrInactive(status) &&
+      !attendeeCapacityReminderEventIds.has(event.id)
+    ) {
+      attendeeCapacityReminderEventIds.add(event.id);
+      Alert.alert("Event nearly full", `You are registered for "${event.title}", but it is nearly full.`);
+    }
   }
 }
 
@@ -225,6 +325,7 @@ async function refreshPresenceTracking() {
   await stopLocationUpdatesIfIdle();
   await ensureLocationUpdatesRunning();
   await maybeNotifyMissingParticipants(snapshot.attendingEvents);
+  await maybeNotifyAttendeeEventRules(snapshot.attendingEvents);
   await maybeNotifyCapacityWarnings(snapshot.hostingEvents);
 }
 
@@ -278,6 +379,10 @@ export function stopOpenAppEventPresenceTracking() {
   missingReminderEventIds.clear();
   capacityWarningEventIds.clear();
   endedByHostLeaveEventIds.clear();
+  hostArrivedReminderEventIds.clear();
+  hostLeftReminderEventIds.clear();
+  minimumMissingReminderEventIds.clear();
+  attendeeCapacityReminderEventIds.clear();
 
   locationSubscription?.remove();
   locationSubscription = null;

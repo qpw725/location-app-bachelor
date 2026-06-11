@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { CommonActions } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
@@ -12,11 +12,17 @@ import { colors, commonStyles } from "../../styles/common";
 type Props = NativeStackScreenProps<RootStackParamList, "CreateEventAttendance">;
 
 const presenceOptions: Array<{
-  method: EventAttendanceMethod;
+  method: EventAttendanceMethod | null;
   title: string;
   eyebrow: string;
   description: string;
 }> = [
+  {
+    method: null,
+    title: "No presence detection",
+    eyebrow: "Optional",
+    description: "Create the event without automatic attendance tracking.",
+  },
   {
     method: "gps_geofence",
     title: "GPS event area",
@@ -40,27 +46,27 @@ const behaviorRules: Array<{
   {
     id: "host_enters_area",
     title: "Host enters area",
-    description: "The event can become active when the host is physically present.",
+    description: "The event can become active during the time range when the host is present. Accepted participants are alerted when the host arrives.",
   },
   {
     id: "host_leaves_area",
     title: "Host leaves area",
-    description: "The event stops when the host leaves the event area after it has started.",
+    description: "The event stops when the host leaves the event area after it has started. Missing and inactive participants are alerted that it ended.",
   },
   {
     id: "minimum_present",
     title: "Minimum participants present",
-    description: "The event can be marked ready when enough participants have arrived.",
+    description: "The event can be marked ready when enough participants have arrived. Missing participants are reminded at the start if there are not enough people present.",
   },
   {
     id: "missing_after_start",
     title: "Missing participants",
-    description: "The host can see accepted participants who are not present after the event starts.",
+    description: "Accepted participants who are not present after the selected delay receive a reminder to arrive.",
   },
   {
     id: "capacity_warning",
     title: "Capacity warning",
-    description: "The host can be warned when the present count reaches a selected limit.",
+    description: "The host is warned when the present count reaches the selected limit, and missing participants are warned that the event is nearly full.",
   },
 ];
 
@@ -84,7 +90,7 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
     invitedPeople,
   } = route.params;
 
-  const [selectedMethod, setSelectedMethod] = useState<EventAttendanceMethod>("gps_geofence");
+  const [selectedMethod, setSelectedMethod] = useState<EventAttendanceMethod | null>(null);
   const [liveMapEnabled, setLiveMapEnabled] = useState(false);
   const [attendanceRadiusMeters, setAttendanceRadiusMeters] = useState(75);
   const [attendanceRadiusInput, setAttendanceRadiusInput] = useState("75");
@@ -102,41 +108,8 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
   const [createEventError, setCreateEventError] = useState<string | null>(null);
   const [createEventSuccess, setCreateEventSuccess] = useState<string | null>(null);
 
-  const selectedPresenceOption = useMemo(
-    () => presenceOptions.find((option) => option.method === selectedMethod) ?? presenceOptions[0],
-    [selectedMethod]
-  );
-
-  const enabledRuleCount = useMemo(
-    () => Object.values(enabledRules).filter(Boolean).length,
-    [enabledRules]
-  );
-
-  const selectedRuleSummaries = useMemo(() => {
-    const summaries: string[] = [];
-
-    if (enabledRules.host_enters_area) {
-      summaries.push("Event can become active when the host is present");
-    }
-
-    if (enabledRules.host_leaves_area) {
-      summaries.push("Event stops when the host leaves after start");
-    }
-
-    if (enabledRules.minimum_present) {
-      summaries.push(`Ready when ${minimumPresentCount || "0"} participants are present`);
-    }
-
-    if (enabledRules.missing_after_start) {
-      summaries.push(`Show missing participants after ${missingAfterMinutes || "0"} minutes`);
-    }
-
-    if (enabledRules.capacity_warning) {
-      summaries.push(`Warn host at ${capacityWarningCount || "0"} present participants`);
-    }
-
-    return summaries;
-  }, [attendanceRadiusMeters, capacityWarningCount, enabledRules, minimumPresentCount, missingAfterMinutes]);
+  const enabledRuleCount = Object.values(enabledRules).filter(Boolean).length;
+  const hasGpsPresence = selectedMethod === "gps_geofence";
 
   function updateAttendanceRadius(value: number) {
     const nextRadius = clampRadius(value);
@@ -192,22 +165,17 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
     setCreateEventError(null);
     setCreateEventSuccess(null);
 
-    if (enabledRuleCount === 0) {
-      setCreateEventError("Select at least one event behavior rule.");
-      return;
-    }
-
-    if (enabledRules.minimum_present && (Number(minimumPresentCount) || 0) < 1) {
+    if (hasGpsPresence && enabledRules.minimum_present && (Number(minimumPresentCount) || 0) < 1) {
       setCreateEventError("Minimum participant count must be at least 1.");
       return;
     }
 
-    if (enabledRules.missing_after_start && (Number(missingAfterMinutes) || 0) < 1) {
+    if (hasGpsPresence && enabledRules.missing_after_start && (Number(missingAfterMinutes) || 0) < 1) {
       setCreateEventError("Missing participant delay must be at least 1 minute.");
       return;
     }
 
-    if (enabledRules.capacity_warning && (Number(capacityWarningCount) || 0) < 1) {
+    if (hasGpsPresence && enabledRules.capacity_warning && (Number(capacityWarningCount) || 0) < 1) {
       setCreateEventError("Capacity warning count must be at least 1.");
       return;
     }
@@ -265,9 +233,9 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
         end_time: endDate.toISOString(),
         genre: selectedCategory,
         private: visibility === "Private",
-        attendance_enabled: true,
+        attendance_enabled: hasGpsPresence,
         attendance_method: selectedMethod,
-        attendance_radius_meters: selectedMethod === "gps_geofence" ? attendanceRadiusMeters : null,
+        attendance_radius_meters: hasGpsPresence ? attendanceRadiusMeters : null,
         live_map_enabled: liveMapEnabled,
         status: "scheduled",
         started_at: null,
@@ -307,7 +275,7 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
       }
     }
 
-    const triggerRows = buildTriggerRows();
+    const triggerRows = hasGpsPresence ? buildTriggerRows() : [];
     const { error: triggerError } = await saveEventBehaviorTriggers(createdEvent.id, triggerRows);
     if (triggerError) {
       setCreateEventError(triggerError);
@@ -317,7 +285,7 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
 
     console.log("[Event behavior selected]", {
       eventId: createdEvent.id,
-      presenceDetectionEnabled: true,
+      presenceDetectionEnabled: hasGpsPresence,
       presenceDetectionMethod: selectedMethod,
       liveMapEnabled,
       behaviorTriggers: triggerRows,
@@ -345,14 +313,7 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
-        <StepIndicator step={4} total={4} label="Behavior" />
-
-        <View style={commonStyles.heroCard}>
-          <Text style={commonStyles.heroTitle}>Configure event behavior</Text>
-          <Text style={commonStyles.heroSubtitle}>
-            Choose how this event should react to presence, participant counts, and missing participants.
-          </Text>
-        </View>
+        <StepIndicator step={4} total={4} label="GPS features" />
 
         <View style={commonStyles.card}>
           <Text style={commonStyles.cardTitle}>Presence detection</Text>
@@ -361,7 +322,7 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
               const isSelected = option.method === selectedMethod;
               return (
                 <Pressable
-                  key={option.method}
+                  key={option.method ?? "none"}
                   onPress={() => setSelectedMethod(option.method)}
                   style={({ pressed }) => [
                     styles.methodCard,
@@ -387,7 +348,22 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
           </View>
         </View>
 
-        {selectedMethod === "gps_geofence" ? (
+        <View style={commonStyles.card}>
+          <View style={styles.switchRow}>
+            <View style={styles.switchTextWrap}>
+              <Text style={styles.switchTitle}>Live map</Text>
+              <Text style={styles.switchDescription}>Show live attendee markers during the event window.</Text>
+            </View>
+            <Switch
+              value={liveMapEnabled}
+              onValueChange={setLiveMapEnabled}
+              trackColor={{ false: "#d8c7b3", true: "#b8d2c4" }}
+              thumbColor={liveMapEnabled ? colors.primary : colors.surface}
+            />
+          </View>
+        </View>
+
+        {hasGpsPresence ? (
           <View style={commonStyles.card}>
             <Text style={commonStyles.cardTitle}>Event area</Text>
             <Text style={styles.cardText}>Presence rules use this radius around the selected event location.</Text>
@@ -424,21 +400,7 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
           </View>
         ) : null}
 
-        <View style={commonStyles.card}>
-          <View style={styles.switchRow}>
-            <View style={styles.switchTextWrap}>
-              <Text style={styles.switchTitle}>Live map</Text>
-              <Text style={styles.switchDescription}>Show live attendee markers during the event window.</Text>
-            </View>
-            <Switch
-              value={liveMapEnabled}
-              onValueChange={setLiveMapEnabled}
-              trackColor={{ false: "#d8c7b3", true: "#b8d2c4" }}
-              thumbColor={liveMapEnabled ? colors.primary : colors.surface}
-            />
-          </View>
-        </View>
-
+        {hasGpsPresence ? (
         <View style={commonStyles.card}>
           <View style={styles.ruleHeader}>
             <Text style={styles.cardTitleNoMargin}>Trigger rules</Text>
@@ -519,25 +481,7 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
             })}
           </View>
         </View>
-
-        <View style={commonStyles.card}>
-          <Text style={commonStyles.cardTitle}>Behavior summary</Text>
-          <Text style={styles.cardText}>{selectedPresenceOption.title}</Text>
-          <View style={styles.summaryRow}>
-            <View style={styles.summaryDot} />
-            <Text style={styles.summaryText}>Live map is {liveMapEnabled ? "enabled" : "disabled"}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <View style={styles.summaryDot} />
-            <Text style={styles.summaryText}>People are marked present inside {attendanceRadiusMeters} m</Text>
-          </View>
-          {selectedRuleSummaries.map((summary) => (
-            <View key={summary} style={styles.summaryRow}>
-              <View style={styles.summaryDot} />
-              <Text style={styles.summaryText}>{summary}</Text>
-            </View>
-          ))}
-        </View>
+        ) : null}
 
         {createEventError ? <Text style={commonStyles.errorText}>{createEventError}</Text> : null}
         {createEventSuccess ? <Text style={commonStyles.successText}>{createEventSuccess}</Text> : null}
@@ -774,25 +718,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     marginLeft: 4,
-  },
-  summaryRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    marginTop: 6,
-  },
-  summaryDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: "#2f5d50",
-    marginTop: 7,
-  },
-  summaryText: {
-    flex: 1,
-    color: "#5f5145",
-    fontSize: 14,
-    lineHeight: 20,
   },
   primaryBtnTop: {
     marginTop: 6,

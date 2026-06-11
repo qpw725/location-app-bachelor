@@ -187,6 +187,20 @@ function isPastEvent(event: EventItem, now: number) {
   return typeof endTime === "number" && endTime < now;
 }
 
+function isEndedEventRow(event: Pick<DbEventRow, "end_time" | "status" | "ended_at">, now = Date.now()) {
+  if (event.status?.toLowerCase() === "ended") {
+    return true;
+  }
+
+  const endedMs = event.ended_at ? new Date(event.ended_at).getTime() : NaN;
+  if (Number.isFinite(endedMs) && endedMs <= now) {
+    return true;
+  }
+
+  const endMs = event.end_time ? new Date(event.end_time).getTime() : NaN;
+  return Number.isFinite(endMs) && endMs <= now;
+}
+
 function normalizeEventStatus(value: string | null): EventItem["status"] {
   if (
     value === "scheduled" ||
@@ -500,18 +514,7 @@ export async function fetchHomeOverview(): Promise<{ data: HomeOverview | null; 
     }
 
     for (const row of (invitedEventRows ?? []) as Array<{ id: string; start_time: string | null; end_time: string | null; status: string | null; ended_at: string | null }>) {
-      if (row.status === "ended") {
-        continue;
-      }
-
-      const endTime = row.ended_at
-        ? new Date(row.ended_at).getTime()
-        : row.end_time
-          ? new Date(row.end_time).getTime()
-          : row.start_time
-            ? new Date(row.start_time).getTime()
-            : NaN;
-      if (Number.isNaN(endTime) || endTime < now) {
+      if (isEndedEventRow(row, now)) {
         continue;
       }
       if (pendingInviteIds.has(row.id)) {
@@ -591,7 +594,7 @@ export async function fetchHomeActivity(): Promise<{ data: HomeActivityItem[] | 
     .eq("invitee_id", userId)
     .eq("status", "pending")
     .order("created_at", { ascending: false })
-    .limit(3);
+    .limit(20);
 
   if (eventInviteError) {
     return { data: null, error: eventInviteError.message };
@@ -602,10 +605,10 @@ export async function fetchHomeActivity(): Promise<{ data: HomeActivityItem[] | 
   const hostMap = new Map<string, ProfileRow>();
 
   if (pendingEventIds.length > 0) {
-    const { data: eventRows, error: eventRowsError } = await supabase
+      const { data: eventRows, error: eventRowsError } = await supabase
       .from("events")
       .select(
-        "id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id, attendance_enabled, attendance_method, attendance_radius_meters, live_map_enabled"
+        "id, title, description, location, latitude, longitude, start_time, end_time, genre, private, creator_id, attendance_enabled, attendance_method, attendance_radius_meters, live_map_enabled, status, ended_at"
       )
       .in("id", pendingEventIds);
 
@@ -634,10 +637,11 @@ export async function fetchHomeActivity(): Promise<{ data: HomeActivityItem[] | 
     }
   }
 
+  const now = Date.now();
   const eventItems: HomeActivityItem[] = ((pendingEventInviteRows ?? []) as Array<{ event_id: string; invitee_id: string }>)
     .map((row) => {
       const event = eventMap.get(row.event_id);
-      if (!event) {
+      if (!event || isEndedEventRow(event, now)) {
         return null;
       }
       const hostProfile = event.creator_id ? hostMap.get(event.creator_id) : undefined;

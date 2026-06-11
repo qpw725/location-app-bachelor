@@ -57,12 +57,6 @@ export default function HostingEventsScreen({ navigation }: Props) {
       contentContainerStyle={commonStyles.scrollContent}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
     >
-      <View style={commonStyles.heroCard}>
-        <Text style={commonStyles.heroEyebrow}>Hosting</Text>
-        <Text style={commonStyles.heroTitle}>Events you are running</Text>
-        <Text style={commonStyles.heroSubtitle}>A focused list of your upcoming hosted events.</Text>
-      </View>
-
       {loading ? (
         <View style={commonStyles.stateCard}>
           <ActivityIndicator size="small" />

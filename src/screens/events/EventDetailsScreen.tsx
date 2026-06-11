@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import * as Calendar from "expo-calendar";
@@ -348,30 +348,6 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
             <EventInviteStatusSection eventId={event.id} />
           </View>
 
-          {source === "hosting" && event.attendanceEnabled && runtimeStatus?.canShowLiveState ? (
-            <View style={commonStyles.card}>
-              <Text style={styles.sectionTitle}>Missing accepted participants</Text>
-              <PresenceExceptionList
-                people={runtimeStatus.missingParticipants}
-                emptyText="No accepted participants are still waiting to arrive."
-                badgeLabel="Missing"
-                badgeTone="danger"
-              />
-            </View>
-          ) : null}
-
-          {source === "hosting" && event.attendanceEnabled && runtimeStatus?.canShowLiveState ? (
-            <View style={commonStyles.card}>
-              <Text style={styles.sectionTitle}>Left event area</Text>
-              <PresenceExceptionList
-                people={runtimeStatus.leftParticipants}
-                emptyText="No previously present participants have left the event area."
-                badgeLabel="Left"
-                badgeTone="warning"
-              />
-            </View>
-          ) : null}
-
           {source === "attending" ? (
             <View style={styles.actionRow}>
               <Pressable style={styles.secondaryButton} onPress={confirmLeaveEvent} disabled={processingAction}>
@@ -419,68 +395,7 @@ function PersonalPresenceCard({ presence, eventEnded }: { presence: EventPresenc
   );
 }
 
-function PresenceExceptionList({
-  people,
-  emptyText,
-  badgeLabel,
-  badgeTone,
-}: {
-  people: EventPresencePerson[];
-  emptyText: string;
-  badgeLabel: string;
-  badgeTone: "danger" | "warning";
-}) {
-  if (people.length === 0) {
-    return <Text style={styles.emptyText}>{emptyText}</Text>;
-  }
-
-  return (
-    <View style={styles.missingList}>
-      {people.map((participant) => (
-        <PresenceExceptionRow
-          key={participant.id}
-          participant={participant}
-          badgeLabel={badgeLabel}
-          badgeTone={badgeTone}
-        />
-      ))}
-    </View>
-  );
-}
-
-function PresenceExceptionRow({
-  participant,
-  badgeLabel,
-  badgeTone,
-}: {
-  participant: EventPresencePerson;
-  badgeLabel: string;
-  badgeTone: "danger" | "warning";
-}) {
-  return (
-    <View style={styles.missingRow}>
-      <ProfileAvatar
-        avatarUrl={participant.avatarUrl}
-        initials={getProfileInitials(participant.name, participant.username)}
-        size={42}
-      />
-      <View style={styles.missingTextWrap}>
-        <Text style={styles.missingName} numberOfLines={1}>
-          {participant.name}
-        </Text>
-        {participant.username ? <Text style={styles.missingUsername}>@{participant.username}</Text> : null}
-        {participant.distanceMeters !== null ? (
-          <Text style={styles.missingMeta}>{Math.round(participant.distanceMeters)} m from event area</Text>
-        ) : participant.lastLocationAt ? (
-          <Text style={styles.missingMeta}>Location inactive</Text>
-        ) : null}
-      </View>
-      <View style={[styles.missingBadge, badgeTone === "warning" && styles.leftBadge]}>
-        <Text style={[styles.missingBadgeText, badgeTone === "warning" && styles.leftBadgeText]}>{badgeLabel}</Text>
-      </View>
-    </View>
-  );
-}
+type AttendanceFilter = "present" | "arrived" | "missing" | "left";
 
 function AttendanceOverview({
   status,
@@ -491,11 +406,44 @@ function AttendanceOverview({
   eventStartAt: Date | null;
   eventEndAt: Date | null;
 }) {
+  const [selectedFilter, setSelectedFilter] = useState<AttendanceFilter>("present");
   const arrivedCount = status.participants.filter((participant) => participant.hasCheckedIn).length;
   const leftCount = status.participants.filter((participant) => participant.presenceState === "left").length;
   const notArrivedCount = status.participants.filter(
     (participant) => participant.presenceState === "not_arrived" || participant.presenceState === "inactive"
   ).length;
+  const metrics = useMemo(
+    () => [
+      {
+        filter: "present" as const,
+        label: "Present now",
+        value: String(status.presentCount),
+        people: status.participants.filter((participant) => participant.presenceState === "present"),
+      },
+      {
+        filter: "arrived" as const,
+        label: "Arrived",
+        value: String(arrivedCount),
+        people: status.participants.filter((participant) => participant.hasCheckedIn),
+      },
+      {
+        filter: "missing" as const,
+        label: "Missing",
+        value: String(notArrivedCount),
+        people: status.participants.filter(
+          (participant) => participant.presenceState === "not_arrived" || participant.presenceState === "inactive"
+        ),
+      },
+      {
+        filter: "left" as const,
+        label: "Left",
+        value: String(leftCount),
+        people: status.participants.filter((participant) => participant.presenceState === "left"),
+      },
+    ],
+    [arrivedCount, leftCount, notArrivedCount, status.participants, status.presentCount]
+  );
+  const selectedMetric = metrics.find((metric) => metric.filter === selectedFilter) ?? metrics[0];
 
   if (status.participants.length === 0) {
     return <Text style={styles.emptyText}>No accepted participants yet.</Text>;
@@ -504,41 +452,59 @@ function AttendanceOverview({
   return (
     <View>
       <View style={styles.attendanceMetricGrid}>
-        <AttendanceMetric label="Present now" value={String(status.presentCount)} />
-        <AttendanceMetric label="Arrived" value={String(arrivedCount)} />
-        <AttendanceMetric label="Missing" value={String(notArrivedCount)} />
-        <AttendanceMetric label="Left" value={String(leftCount)} />
+        {metrics.map((metric) => (
+          <AttendanceMetric
+            key={metric.filter}
+            label={metric.label}
+            value={metric.value}
+            selected={selectedFilter === metric.filter}
+            onPress={() => setSelectedFilter(metric.filter)}
+          />
+        ))}
       </View>
 
+      <Text style={styles.attendanceListTitle}>{selectedMetric.label}</Text>
       <View style={styles.attendanceList}>
-        {status.participants.map((participant) => (
-          <AttendanceParticipantRow key={participant.id} participant={participant} eventStartAt={eventStartAt} eventEndAt={eventEndAt} />
-        ))}
+        {selectedMetric.people.length === 0 ? (
+          <Text style={styles.attendanceEmptyText}>{getAttendanceEmptyText(selectedFilter)}</Text>
+        ) : (
+          selectedMetric.people.map((participant) => (
+            <AttendanceParticipantRow
+              key={participant.id}
+              participant={participant}
+              filter={selectedFilter}
+              eventStartAt={eventStartAt}
+              eventEndAt={eventEndAt}
+            />
+          ))
+        )}
       </View>
     </View>
   );
 }
 
-function AttendanceMetric({ label, value }: { label: string; value: string }) {
+function AttendanceMetric({ label, value, selected, onPress }: { label: string; value: string; selected: boolean; onPress: () => void }) {
   return (
-    <View style={styles.attendanceMetric}>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.attendanceMetric, selected && styles.attendanceMetricActive, pressed && commonStyles.pressed]}>
       <Text style={styles.attendanceMetricValue}>{value}</Text>
       <Text style={styles.attendanceMetricLabel}>{label}</Text>
-    </View>
+    </Pressable>
   );
 }
 
 function AttendanceParticipantRow({
   participant,
+  filter,
   eventStartAt,
   eventEndAt,
 }: {
   participant: EventPresencePerson;
+  filter: AttendanceFilter;
   eventStartAt: Date | null;
   eventEndAt: Date | null;
 }) {
   const model = getAttendanceStatusModel(participant);
-  const timingLines = getAttendanceTimingLines(participant, eventStartAt, eventEndAt);
+  const timingLines = getAttendanceTimingLines(participant, filter, eventStartAt, eventEndAt);
 
   return (
     <View style={styles.attendanceRow}>
@@ -565,6 +531,13 @@ function AttendanceParticipantRow({
   );
 }
 
+function getAttendanceEmptyText(filter: AttendanceFilter) {
+  if (filter === "present") return "No participants are currently present.";
+  if (filter === "arrived") return "No participants have arrived yet.";
+  if (filter === "missing") return "No participants are missing right now.";
+  return "No participants have left the event area.";
+}
+
 function getAttendanceStatusModel(participant: EventPresencePerson) {
   if (participant.presenceState === "present") {
     return { label: "Present", tone: "success" as const };
@@ -581,29 +554,39 @@ function getAttendanceStatusModel(participant: EventPresencePerson) {
   return { label: "Missing", tone: "danger" as const };
 }
 
-function getAttendanceTimingLines(participant: EventPresencePerson, eventStartAt: Date | null, eventEndAt: Date | null) {
+function getAttendanceTimingLines(
+  participant: EventPresencePerson,
+  filter: AttendanceFilter,
+  eventStartAt: Date | null,
+  eventEndAt: Date | null
+) {
   const lines: string[] = [];
 
-  if (participant.checkedInAt) {
-    const arrivedAt = new Date(participant.checkedInAt);
-    const lateMinutes = getLateMinutes(arrivedAt, eventStartAt);
-    lines.push(`Arrived ${formatShortTime(arrivedAt)}${lateMinutes > 0 ? ` - ${lateMinutes} min late` : ""}`);
-  } else {
-    lines.push("No arrival recorded");
+  if (filter === "present") {
+    lines.push(participant.checkedInAt ? `Arrived at ${formatShortTime(new Date(participant.checkedInAt))}` : "Arrival time not recorded");
+    return lines;
   }
 
-  const checkedOutAt = participant.checkedOutAt ? new Date(participant.checkedOutAt) : null;
-  if (participant.presenceState === "left" && checkedOutAt) {
-    const leftAt = checkedOutAt;
-    lines.push(`Left area ${formatShortTime(leftAt)}${isBeforeEventEnd(leftAt, eventEndAt) ? " - before end" : ""}`);
+  if (filter === "arrived") {
+    lines.push(participant.checkedInAt ? `Arrived at ${formatShortTime(new Date(participant.checkedInAt))}` : "Arrival time not recorded");
+    lines.push(participant.checkedOutAt ? `Left at ${formatShortTime(new Date(participant.checkedOutAt))}` : "Still present");
+    return lines;
   }
 
-  if (participant.presenceState === "inactive" && participant.lastLocationAt) {
-    lines.push(`Location inactive since ${formatShortTime(new Date(participant.lastLocationAt))}`);
+  if (filter === "missing") {
+    if (participant.presenceState === "inactive" || !participant.lastLocationAt) {
+      lines.push("GPS inactive");
+    } else if (participant.distanceMeters !== null) {
+      lines.push(`${Math.round(participant.distanceMeters)} m from event when last updated`);
+    } else {
+      lines.push("Distance from event unavailable");
+    }
+    return lines;
   }
 
-  if (participant.presenceState === "present" && participant.distanceMeters !== null) {
-    lines.push(`${Math.round(participant.distanceMeters)} m from event location`);
+  if (filter === "left") {
+    lines.push(participant.checkedInAt ? `Arrived at ${formatShortTime(new Date(participant.checkedInAt))}` : "Arrival time not recorded");
+    lines.push(participant.checkedOutAt ? `Left at ${formatShortTime(new Date(participant.checkedOutAt))}${isBeforeEventEnd(new Date(participant.checkedOutAt), eventEndAt) ? " - before end" : ""}` : "Left time not recorded");
   }
 
   return lines;
@@ -825,6 +808,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff6ea",
     padding: 12,
   },
+  attendanceMetricActive: {
+    borderColor: "#2f5d50",
+    backgroundColor: "#edf4ee",
+  },
   attendanceMetricValue: {
     color: "#201c19",
     fontSize: 22,
@@ -840,6 +827,18 @@ const styles = StyleSheet.create({
   attendanceList: {
     borderTopWidth: 1,
     borderTopColor: "#efe4d7",
+  },
+  attendanceListTitle: {
+    color: "#201c19",
+    fontSize: 15,
+    fontWeight: "900",
+    marginBottom: 8,
+  },
+  attendanceEmptyText: {
+    color: "#6f6258",
+    fontSize: 13,
+    lineHeight: 19,
+    paddingTop: 10,
   },
   attendanceRow: {
     flexDirection: "row",
@@ -945,53 +944,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   emptyText: { color: "#6f6258", fontSize: 13, lineHeight: 19 },
-  missingList: {
-    gap: 0,
-  },
-  missingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 11,
-    borderBottomWidth: 1,
-    borderBottomColor: "#efe4d7",
-  },
-  missingTextWrap: {
-    flex: 1,
-  },
-  missingName: {
-    color: "#201c19",
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  missingUsername: {
-    color: "#6f6258",
-    fontSize: 12,
-    marginTop: 2,
-  },
-  missingMeta: {
-    color: "#8a7f74",
-    fontSize: 11,
-    fontWeight: "700",
-    marginTop: 3,
-  },
-  missingBadge: {
-    backgroundColor: "#fff1f1",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  leftBadge: {
-    backgroundColor: "#fff6ea",
-  },
-  missingBadgeText: {
-    color: "#a23d3d",
-    fontSize: 11,
-    fontWeight: "800",
-  },
-  leftBadgeText: {
-    color: "#8a5a12",
-  },
   infoRow: { paddingVertical: 8 },
   infoLabel: { fontSize: 12, color: "#6f6258", fontWeight: "800", textTransform: "uppercase" },
   infoValue: { marginTop: 4, fontSize: 15, color: "#201c19", fontWeight: "600", lineHeight: 20 },

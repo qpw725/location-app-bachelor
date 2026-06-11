@@ -93,6 +93,8 @@ export type EventRuntimeStatus = {
   hostPresent: boolean;
   minimumPresentCount: number | null;
   capacityLimit: number | null;
+  hostPresenceRequired?: boolean;
+  missingAfterStartEnabled?: boolean;
   endedByHostLeaving?: boolean;
 };
 
@@ -397,7 +399,14 @@ function deriveRuntimeStatus(input: {
     : [];
   const leftParticipants = acceptedParticipants.filter((person) => person.presenceState === "left");
   const createRuntimeStatus = (status: Omit<EventRuntimeStatus, "participants">) =>
-    createStatus(status, acceptedParticipants);
+    createStatus(
+      {
+        ...status,
+        hostPresenceRequired: hostRequired,
+        missingAfterStartEnabled: missingTriggerEnabled,
+      },
+      acceptedParticipants
+    );
   const isBeforeStart = Number.isFinite(startMs) && now < startMs;
   const canAutoStartBeforeScheduledTime = event.startMode === "auto_on_ready";
   const isManualStartRequired = event.startMode === "manual" && !isManuallyActivated;

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, ActivityIndicator, RefreshControl, Modal } from "react-native";
+import ProfileAvatar from "../../components/ProfileAvatar";
+import { getAvatarPublicUrl, getProfileInitials } from "../../profile";
 import { supabase } from "../../supabase";
 import { commonStyles } from "../../styles/common";
 
@@ -12,6 +14,8 @@ type EventInviteItem = {
   when: string;
   where: string;
   from: string;
+  fromUsername: string;
+  fromAvatarUrl: string | null;
   status: InboxItemStatus;
 };
 
@@ -20,6 +24,7 @@ type FriendRequestItem = {
   senderId: string;
   name: string;
   username: string;
+  avatarUrl: string | null;
   mutuals: number;
   status: InboxItemStatus;
 };
@@ -28,6 +33,7 @@ type FriendItem = {
   id: string;
   name: string;
   username: string;
+  avatarUrl: string | null;
   createdAt: string | null;
 };
 
@@ -36,6 +42,7 @@ type ProfileRow = {
   username: string | null;
   first_name: string | null;
   last_name: string | null;
+  avatar_path: string | null;
   created_at?: string | null;
 };
 
@@ -90,20 +97,18 @@ function formatEventTime(startIso: string | null, endIso: string | null) {
   return `${dateLabel} ${startLabel} - ${endLabel}`;
 }
 
-function isFinishedEvent(event: Pick<EventRow, "start_time" | "end_time" | "status" | "ended_at">) {
-  if (event.status === "ended") {
+function isEndedEvent(event: Pick<EventRow, "end_time" | "status" | "ended_at">, now = Date.now()) {
+  if (event.status?.toLowerCase() === "ended") {
     return true;
   }
 
-  const endMs = event.ended_at
-    ? new Date(event.ended_at).getTime()
-    : event.end_time
-      ? new Date(event.end_time).getTime()
-      : event.start_time
-        ? new Date(event.start_time).getTime()
-        : NaN;
+  const endedMs = event.ended_at ? new Date(event.ended_at).getTime() : NaN;
+  if (Number.isFinite(endedMs) && endedMs <= now) {
+    return true;
+  }
 
-  return Number.isFinite(endMs) && endMs < Date.now();
+  const endMs = event.end_time ? new Date(event.end_time).getTime() : NaN;
+  return Number.isFinite(endMs) && endMs <= now;
 }
 
 export default function InboxScreen() {
@@ -210,7 +215,7 @@ export default function InboxScreen() {
     if (senderIds.length > 0) {
       const { data: senderProfiles, error: senderProfilesError } = await supabase
         .from("profiles")
-        .select("id, username, first_name, last_name")
+        .select("id, username, first_name, last_name, avatar_path")
         .in("id", senderIds);
 
       if (senderProfilesError) {
@@ -234,6 +239,7 @@ export default function InboxScreen() {
           senderId: request.sender_id,
           name: senderProfile ? fullNameFromProfile(senderProfile) : "Unknown user",
           username: senderProfile?.username?.trim() ?? "unknown",
+          avatarUrl: getAvatarPublicUrl(senderProfile?.avatar_path?.trim() || null),
           mutuals: 0,
           status: request.status,
         };
@@ -280,7 +286,7 @@ export default function InboxScreen() {
       if (creatorIds.length > 0) {
         const { data: hostProfiles, error: hostProfilesError } = await supabase
           .from("profiles")
-          .select("id, username, first_name, last_name")
+          .select("id, username, first_name, last_name, avatar_path")
           .in("id", creatorIds);
 
         if (hostProfilesError) {
@@ -301,7 +307,7 @@ export default function InboxScreen() {
       ((eventInviteRows ?? []) as EventInviteRow[])
         .map((invite) => {
           const event = eventMap.get(invite.event_id);
-          if (!event || isFinishedEvent(event)) {
+          if (!event || isEndedEvent(event)) {
             return null;
           }
 
@@ -313,6 +319,8 @@ export default function InboxScreen() {
             when: formatEventTime(event.start_time, event.end_time),
             where: event.location?.trim() || "Location not set",
             from: hostProfile ? fullNameFromProfile(hostProfile) : "Unknown host",
+            fromUsername: hostProfile?.username?.trim() ?? "",
+            fromAvatarUrl: getAvatarPublicUrl(hostProfile?.avatar_path?.trim() || null),
             status: invite.status,
           };
         })
@@ -346,7 +354,7 @@ export default function InboxScreen() {
 
     const { data: friendProfiles, error: friendProfilesError } = await supabase
       .from("profiles")
-      .select("id, username, first_name, last_name, created_at")
+      .select("id, username, first_name, last_name, avatar_path, created_at")
       .in("id", friendIds);
 
     if (friendProfilesError) {
@@ -362,6 +370,7 @@ export default function InboxScreen() {
         id: profile.id,
         name: fullNameFromProfile(profile),
         username: profile.username?.trim() ?? "",
+        avatarUrl: getAvatarPublicUrl(profile.avatar_path?.trim() || null),
         createdAt: profile.created_at ?? null,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -442,7 +451,7 @@ export default function InboxScreen() {
         return;
       }
 
-      if (!event || isFinishedEvent(event)) {
+      if (!event || isEndedEvent(event)) {
         setErrorMessage("This event has already ended.");
         await loadSocialData(userId);
         return;
@@ -684,14 +693,6 @@ export default function InboxScreen() {
       overScrollMode="always"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} />}
     >
-      <View style={commonStyles.heroCard}>
-        <Text style={commonStyles.heroEyebrow}>Inbox</Text>
-        <Text style={commonStyles.heroTitle}>Keep up with everything new</Text>
-        <Text style={commonStyles.heroSubtitle}>
-          {pendingEventInvites.length + pendingFriendRequests.length} actions waiting across invites and friend requests.
-        </Text>
-      </View>
-
       {errorMessage ? <Text style={commonStyles.errorText}>{errorMessage}</Text> : null}
       {successMessage ? <Text style={commonStyles.successText}>{successMessage}</Text> : null}
 
@@ -707,7 +708,17 @@ export default function InboxScreen() {
               <Text style={styles.inviteTitle}>{invite.title}</Text>
               <Text style={styles.inviteMeta}>{invite.when}</Text>
               <Text style={styles.inviteMeta}>{invite.where}</Text>
-              <Text style={styles.inviteHost}>{invite.from}</Text>
+              <View style={styles.inviteHostRow}>
+                <ProfileAvatar
+                  avatarUrl={invite.fromAvatarUrl}
+                  initials={getProfileInitials(invite.from, invite.fromUsername)}
+                  size={34}
+                />
+                <View style={styles.inviteHostTextWrap}>
+                  <Text style={styles.inviteHost}>{invite.from}</Text>
+                  {invite.fromUsername ? <Text style={styles.inviteHostUsername}>@{invite.fromUsername}</Text> : null}
+                </View>
+              </View>
               <View style={styles.actionRow}>
                 <Pressable
                   onPress={() => void updateEventInviteStatus(invite.eventId, "accepted")}
@@ -740,9 +751,11 @@ export default function InboxScreen() {
         ) : (
           pendingFriendRequests.map((request) => (
             <View key={request.id} style={styles.friendRequestCard}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{request.name.charAt(0).toUpperCase()}</Text>
-              </View>
+              <ProfileAvatar
+                avatarUrl={request.avatarUrl}
+                initials={getProfileInitials(request.name, request.username)}
+                size={38}
+              />
               <View style={styles.friendRequestBody}>
                 <Text style={styles.friendName}>{request.name}</Text>
                 <Text style={styles.mutualText}>@{request.username}</Text>
@@ -806,9 +819,11 @@ export default function InboxScreen() {
               onPress={() => setSelectedFriend(friend)}
               style={({ pressed }) => [styles.friendCard, pressed && styles.pressed]}
             >
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{friend.name.charAt(0).toUpperCase()}</Text>
-              </View>
+              <ProfileAvatar
+                avatarUrl={friend.avatarUrl}
+                initials={getProfileInitials(friend.name, friend.username)}
+                size={38}
+              />
               <View style={styles.friendTextWrap}>
                 <Text style={styles.friendName}>{friend.name}</Text>
                 <Text style={styles.friendUsername}>@{friend.username}</Text>
@@ -826,6 +841,15 @@ export default function InboxScreen() {
       >
         <Pressable style={styles.modalBackdrop} onPress={() => setSelectedFriend(null)}>
           <Pressable style={styles.modalCard} onPress={() => {}}>
+            {selectedFriend ? (
+              <View style={styles.modalAvatarWrap}>
+                <ProfileAvatar
+                  avatarUrl={selectedFriend.avatarUrl}
+                  initials={getProfileInitials(selectedFriend.name, selectedFriend.username)}
+                  size={72}
+                />
+              </View>
+            ) : null}
             <Text style={styles.modalTitle}>{selectedFriend?.name}</Text>
             <Text style={styles.modalUsername}>@{selectedFriend?.username}</Text>
 
@@ -886,7 +910,18 @@ const styles = StyleSheet.create({
   },
   inviteTitle: { fontSize: 17, fontWeight: "700", color: "#241f1c", marginBottom: 4 },
   inviteMeta: { fontSize: 13, color: "#6f6258", marginBottom: 1 },
-  inviteHost: { fontSize: 13, color: "#4e6258", marginTop: 6, marginBottom: 10, fontWeight: "600" },
+  inviteHostRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  inviteHostTextWrap: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  inviteHost: { fontSize: 13, color: "#4e6258", fontWeight: "700" },
+  inviteHostUsername: { fontSize: 12, color: "#6f6258", marginTop: 2 },
   actionRow: { flexDirection: "row", gap: 8 },
   primaryAction: {
     flex: 1,
@@ -916,17 +951,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
   },
-  friendRequestBody: { flex: 1 },
-  avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "#efe3d3",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 10,
-  },
-  avatarText: { color: "#4f4339", fontSize: 14, fontWeight: "700" },
+  friendRequestBody: { flex: 1, marginLeft: 10 },
   friendName: { fontSize: 16, fontWeight: "700", color: "#201c19" },
   mutualText: { fontSize: 12, color: "#6f6258", marginTop: 2, marginBottom: 8 },
   searchCard: {
@@ -967,7 +992,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginBottom: 12,
   },
-  friendTextWrap: { flex: 1 },
+  friendTextWrap: { flex: 1, marginLeft: 10 },
   friendUsername: { fontSize: 12, color: "#6f6258", marginTop: 2 },
   emptyCard: {
     backgroundColor: "#fffaf4",
@@ -997,6 +1022,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#eadfce",
     padding: 18,
+  },
+  modalAvatarWrap: {
+    alignItems: "center",
+    marginBottom: 12,
   },
   modalTitle: {
     fontSize: 24,

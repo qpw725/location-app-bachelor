@@ -55,11 +55,6 @@ export default function AttendingEventsScreen({ navigation }: Props) {
       contentContainerStyle={commonStyles.scrollContent}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
     >
-      <View style={commonStyles.heroCard}>
-        <Text style={commonStyles.heroEyebrow}>Attending</Text>
-        <Text style={commonStyles.heroTitle}>Plans you have said yes to</Text>
-        <Text style={commonStyles.heroSubtitle}>Accepted invites and joined events live here, ready when you need them.</Text>
-      </View>
       {loading ? (
         <View style={commonStyles.stateCard}>
           <ActivityIndicator size="small" />

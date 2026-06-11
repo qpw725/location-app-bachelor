@@ -56,11 +56,6 @@ export default function PastEventsScreen({ navigation }: Props) {
       contentContainerStyle={commonStyles.scrollContent}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
     >
-      <View style={commonStyles.heroCard}>
-        <Text style={commonStyles.heroEyebrow}>Past</Text>
-        <Text style={commonStyles.heroTitle}>Moments you have already wrapped up</Text>
-        <Text style={commonStyles.heroSubtitle}>A simple history of completed events you hosted or attended.</Text>
-      </View>
       {loading ? (
         <View style={commonStyles.stateCard}>
           <ActivityIndicator size="small" />
