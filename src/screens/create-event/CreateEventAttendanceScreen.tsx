@@ -167,7 +167,6 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
       triggers.push({
         type: "host_enters_area",
         config: {
-          radiusMeters: attendanceRadiusMeters,
           requireHostPresence: enabledRules.host_enters_area,
           endWhenHostLeaves: enabledRules.host_leaves_area,
         },

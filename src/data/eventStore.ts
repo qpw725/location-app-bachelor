@@ -396,7 +396,8 @@ export async function joinPublicEvent(eventId: string): Promise<{ error: string 
     const { count, error: attendanceCountError } = await supabase
       .from("event_attendance")
       .select("event_id", { count: "exact", head: true })
-      .eq("event_id", eventId);
+      .eq("event_id", eventId)
+      .is("checked_out_at", null);
 
     if (attendanceCountError) {
       return { error: attendanceCountError.message };

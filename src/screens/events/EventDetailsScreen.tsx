@@ -362,7 +362,7 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
 
           {source === "hosting" && event.attendanceEnabled && runtimeStatus?.canShowLiveState ? (
             <View style={commonStyles.card}>
-              <Text style={styles.sectionTitle}>Left or inactive location</Text>
+              <Text style={styles.sectionTitle}>Left event area</Text>
               <PresenceExceptionList
                 people={runtimeStatus.leftParticipants}
                 emptyText="No previously present participants have left the event area."
@@ -492,8 +492,10 @@ function AttendanceOverview({
   eventEndAt: Date | null;
 }) {
   const arrivedCount = status.participants.filter((participant) => participant.hasCheckedIn).length;
-  const leftCount = status.participants.filter((participant) => participant.presenceState === "left" || participant.presenceState === "inactive").length;
-  const notArrivedCount = status.participants.filter((participant) => participant.presenceState === "not_arrived").length;
+  const leftCount = status.participants.filter((participant) => participant.presenceState === "left").length;
+  const notArrivedCount = status.participants.filter(
+    (participant) => participant.presenceState === "not_arrived" || participant.presenceState === "inactive"
+  ).length;
 
   if (status.participants.length === 0) {
     return <Text style={styles.emptyText}>No accepted participants yet.</Text>;
@@ -504,8 +506,8 @@ function AttendanceOverview({
       <View style={styles.attendanceMetricGrid}>
         <AttendanceMetric label="Present now" value={String(status.presentCount)} />
         <AttendanceMetric label="Arrived" value={String(arrivedCount)} />
-        <AttendanceMetric label="Not arrived" value={String(notArrivedCount)} />
-        <AttendanceMetric label="Left/inactive" value={String(leftCount)} />
+        <AttendanceMetric label="Missing" value={String(notArrivedCount)} />
+        <AttendanceMetric label="Left" value={String(leftCount)} />
       </View>
 
       <View style={styles.attendanceList}>

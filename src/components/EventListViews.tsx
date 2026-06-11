@@ -65,9 +65,7 @@ function getRuntimeStatusLabel(status: EventRuntimeStatus | null | undefined) {
   }
 
   if (status.status === "hidden") return "Updates near start";
-  if (status.status === "scheduled") return "Scheduled";
   if (status.status === "pre_event") return "Pre-event";
-  if (status.status === "not_started") return "Not started";
   if (status.status === "host_not_arrived") return "Host not arrived";
   if (status.status === "host_left") return "Host left";
   if (status.status === "not_enough_participants") return "Needs participants";
