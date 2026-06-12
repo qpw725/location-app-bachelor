@@ -51,6 +51,8 @@ export type EventAttendanceMethod = "gps_geofence";
 export type EventInvitee = {
   id: string;
   username: string;
+  name?: string;
+  avatarUrl?: string | null;
 };
 
 export type RootStackParamList = {
@@ -299,7 +301,7 @@ export default function App() {
           <Stack.Screen
             name="CreateEventAttendance"
             component={CreateEventAttendanceScreen}
-            options={{ title: "Behavior", headerBackTitle: "Event" }}
+            options={{ title: "GPS features", headerBackTitle: "Event" }}
           />
           <Stack.Screen
             name="LiveEventMap"

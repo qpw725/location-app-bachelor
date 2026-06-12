@@ -137,11 +137,6 @@ export default function CreateEventLocationScreen({ navigation, route }: Props) 
     <ScrollView style={commonStyles.screen} contentContainerStyle={commonStyles.scrollContent} keyboardShouldPersistTaps="handled">
       <StepIndicator step={2} total={3} label="Location" />
 
-      <View style={commonStyles.heroCard}>
-        <Text style={commonStyles.heroTitle}>Pick where it should happen</Text>
-        <Text style={commonStyles.heroSubtitle}>Search for a place, preview it on the map, and confirm the spot for {eventName}.</Text>
-      </View>
-
       <View style={commonStyles.card}>
         <Text style={commonStyles.cardTitle}>Search location</Text>
         <TextInput

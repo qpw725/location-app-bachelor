@@ -62,14 +62,12 @@ export type EventPresencePerson = {
   checkedOutAt: string | null;
   lastLocationAt: string | null;
   distanceMeters: number | null;
-  presenceState: "present" | "not_arrived" | "left" | "stale";
+  presenceState: "present" | "not_arrived" | "left" | "inactive";
 };
 
 export type EventRuntimeStatusId =
   | "hidden"
-  | "scheduled"
   | "pre_event"
-  | "not_started"
   | "host_not_arrived"
   | "host_left"
   | "not_enough_participants"
@@ -95,6 +93,8 @@ export type EventRuntimeStatus = {
   hostPresent: boolean;
   minimumPresentCount: number | null;
   capacityLimit: number | null;
+  hostPresenceRequired?: boolean;
+  missingAfterStartEnabled?: boolean;
   endedByHostLeaving?: boolean;
 };
 
@@ -207,7 +207,7 @@ async function fetchEventTriggers(eventId: string): Promise<{ data: EventTrigger
     .eq("enabled", true);
 
   if (isMissingTriggerTableError(error)) {
-    return { data: getDefaultTriggers(), error: null };
+    return { data: [], error: null };
   }
 
   if (error) {
@@ -215,7 +215,7 @@ async function fetchEventTriggers(eventId: string): Promise<{ data: EventTrigger
   }
 
   const rows = ((data ?? []) as EventTriggerRow[]).filter((row) => row.type);
-  return { data: rows.length > 0 ? rows : getDefaultTriggers(), error: null };
+  return { data: rows, error: null };
 }
 
 async function fetchEventPresencePeople(event: EventItem): Promise<{ data: EventPresencePerson[] | null; error: string | null }> {
@@ -279,8 +279,11 @@ async function fetchEventPresencePeople(event: EventItem): Promise<{ data: Event
     profileMap.set(profile.id, profile);
   }
 
-  const people = participantIds
-    .map((id): EventPresencePerson | null => {
+  let people: EventPresencePerson[];
+  try {
+    people = (
+      await Promise.all(
+        participantIds.map(async (id): Promise<EventPresencePerson | null> => {
       const profile = profileMap.get(id);
       if (!profile) {
         return null;
@@ -289,7 +292,7 @@ async function fetchEventPresencePeople(event: EventItem): Promise<{ data: Event
       const liveLocation = liveLocationMap.get(id);
       const attendance = attendanceMap.get(id);
       const checkedInAt = attendance?.checked_in_at ?? null;
-      const checkedOutAt = attendance?.checked_out_at ?? null;
+      let checkedOutAt = attendance?.checked_out_at ?? null;
       const hasCheckedIn = attendanceMap.has(id);
       const distanceMeters =
         liveLocation && hasEventCoordinates(event)
@@ -297,6 +300,21 @@ async function fetchEventPresencePeople(event: EventItem): Promise<{ data: Event
           : null;
       const lastLocationMs = liveLocation?.updated_at ? new Date(liveLocation.updated_at).getTime() : NaN;
       const hasFreshLocation = Number.isFinite(lastLocationMs) && Date.now() - lastLocationMs <= CURRENT_LOCATION_MAX_AGE_MS;
+      const shouldCheckOutAtLastLocation = hasCheckedIn && !checkedOutAt && Boolean(liveLocation?.updated_at) && !hasFreshLocation;
+      if (shouldCheckOutAtLastLocation) {
+        const { error: checkoutError } = await supabase
+          .from("event_attendance")
+          .update({ checked_out_at: liveLocation!.updated_at })
+          .eq("event_id", event.id)
+          .eq("user_id", id);
+
+        if (checkoutError) {
+          throw new Error(checkoutError.message);
+        }
+
+        checkedOutAt = liveLocation!.updated_at;
+      }
+
       const isInsideArea =
         hasFreshLocation &&
         typeof distanceMeters === "number" &&
@@ -305,6 +323,7 @@ async function fetchEventPresencePeople(event: EventItem): Promise<{ data: Event
       const presenceState = getPresenceState({
         isInsideArea,
         hasCheckedIn,
+        hasCheckedOut: Boolean(checkedOutAt),
         hasLiveLocation: Boolean(liveLocation),
         hasFreshLocation,
       });
@@ -323,8 +342,12 @@ async function fetchEventPresencePeople(event: EventItem): Promise<{ data: Event
         distanceMeters,
         presenceState,
       };
-    })
-    .filter((person): person is EventPresencePerson => person !== null);
+        })
+      )
+    ).filter((person): person is EventPresencePerson => person !== null);
+  } catch (error) {
+    return { data: null, error: getErrorMessage(error) };
+  }
 
   return { data: people, error: null };
 }
@@ -343,9 +366,7 @@ function deriveRuntimeStatus(input: {
   const endedMs = event.endedAt?.getTime() ?? NaN;
   const leadMinutes = event.preEventWindowMinutes ?? STATUS_LEAD_MINUTES;
   const statusOpenMs = Number.isFinite(startMs) ? startMs - leadMinutes * 60 * 1000 : NaN;
-  const isHostViewer = viewerRole === "hosting";
   const canShowLiveState =
-    isHostViewer ||
     event.status === "pre_event" ||
     event.status === "ready" ||
     event.status === "active" ||
@@ -374,13 +395,19 @@ function deriveRuntimeStatus(input: {
       now >= startMs + (missingAfterMinutes ?? DEFAULT_MISSING_AFTER_MINUTES) * 60 * 1000 ||
       (Number.isFinite(endMs) && now > endMs));
   const missingParticipants = missingVisible
-    ? acceptedParticipants.filter((person) => person.presenceState === "not_arrived")
+    ? acceptedParticipants.filter((person) => person.presenceState === "not_arrived" || person.presenceState === "inactive")
     : [];
-  const leftParticipants = acceptedParticipants.filter((person) => person.presenceState === "left" || person.presenceState === "stale");
+  const leftParticipants = acceptedParticipants.filter((person) => person.presenceState === "left");
   const createRuntimeStatus = (status: Omit<EventRuntimeStatus, "participants">) =>
-    createStatus(status, acceptedParticipants);
+    createStatus(
+      {
+        ...status,
+        hostPresenceRequired: hostRequired,
+        missingAfterStartEnabled: missingTriggerEnabled,
+      },
+      acceptedParticipants
+    );
   const isBeforeStart = Number.isFinite(startMs) && now < startMs;
-  const isInPreEventWindow = Number.isFinite(statusOpenMs) && now >= statusOpenMs && isBeforeStart;
   const canAutoStartBeforeScheduledTime = event.startMode === "auto_on_ready";
   const isManualStartRequired = event.startMode === "manual" && !isManuallyActivated;
 
@@ -408,24 +435,6 @@ function deriveRuntimeStatus(input: {
       severity: "neutral",
       title: "Status updates not open yet",
       message: `Live event behavior appears ${leadMinutes} minutes before the event starts.`,
-      canShowLiveState,
-      presentCount,
-      acceptedCount,
-      missingParticipants: [],
-      leftParticipants: [],
-      viewerPresence,
-      hostPresent,
-      minimumPresentCount,
-      capacityLimit,
-    });
-  }
-
-  if (!isInPreEventWindow && isHostViewer && Number.isFinite(statusOpenMs) && now < statusOpenMs) {
-    return createRuntimeStatus({
-      status: "scheduled",
-      severity: "neutral",
-      title: "Event scheduled",
-      message: `Live event behavior opens ${leadMinutes} minutes before the event starts.`,
       canShowLiveState,
       presentCount,
       acceptedCount,
@@ -589,12 +598,10 @@ function deriveRuntimeStatus(input: {
     }
 
     return createRuntimeStatus({
-      status: isInPreEventWindow ? "pre_event" : "not_started",
+      status: "pre_event",
       severity: "neutral",
-      title: isInPreEventWindow ? "Pre-event window" : "Not started yet",
-      message: isInPreEventWindow
-        ? "Presence tracking is available before the scheduled start time."
-        : "Presence tracking is available, but the scheduled start time has not passed.",
+      title: "Pre-event window",
+      message: "Presence tracking is available before the scheduled start time.",
       canShowLiveState,
       presentCount,
       acceptedCount,
@@ -666,13 +673,6 @@ function createStatus(status: Omit<EventRuntimeStatus, "participants">, particip
   return { ...status, participants };
 }
 
-function getDefaultTriggers(): EventTriggerRow[] {
-  return [
-    { type: "host_enters_area", enabled: true, config: { requireHostPresence: true, endWhenHostLeaves: false } },
-    { type: "missing_after_start", enabled: true, config: { minutesAfterStart: DEFAULT_MISSING_AFTER_MINUTES } },
-  ];
-}
-
 function hasTrigger(triggers: EventTriggerRow[], type: EventTriggerType) {
   return triggers.some((trigger) => trigger.type === type && trigger.enabled !== false);
 }
@@ -723,9 +723,14 @@ function readBoolean(config: Record<string, unknown> | null, key: string, fallba
   return config[key];
 }
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Could not update event presence.";
+}
+
 function getPresenceState(input: {
   isInsideArea: boolean;
   hasCheckedIn: boolean;
+  hasCheckedOut: boolean;
   hasLiveLocation: boolean;
   hasFreshLocation: boolean;
 }): EventPresencePerson["presenceState"] {
@@ -733,15 +738,19 @@ function getPresenceState(input: {
     return "present";
   }
 
+  if (input.hasCheckedOut) {
+    return "left";
+  }
+
+  if (!input.hasLiveLocation || !input.hasFreshLocation) {
+    return "inactive";
+  }
+
   if (!input.hasCheckedIn) {
     return "not_arrived";
   }
 
-  if (input.hasLiveLocation && input.hasFreshLocation) {
-    return "left";
-  }
-
-  return "stale";
+  return "left";
 }
 
 function hasEventCoordinates(event: EventItem) {

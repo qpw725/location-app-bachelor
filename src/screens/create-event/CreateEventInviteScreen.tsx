@@ -12,6 +12,8 @@ import {
 import { CommonActions } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { EventInvitee, RootStackParamList } from "../../../App";
+import ProfileAvatar from "../../components/ProfileAvatar";
+import { getAvatarPublicUrl, getProfileInitials } from "../../profile";
 import StepIndicator from "../../components/StepIndicator";
 import { supabase } from "../../supabase";
 import { colors, commonStyles } from "../../styles/common";
@@ -22,6 +24,7 @@ type FriendSuggestion = {
   id: string;
   username: string;
   name: string;
+  avatarUrl: string | null;
 };
 
 const categoryOptions = [
@@ -155,7 +158,7 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
 
       const { data: friendProfiles, error: friendProfilesError } = await supabase
         .from("profiles")
-        .select("id, username, first_name, last_name")
+        .select("id, username, first_name, last_name, avatar_path")
         .in("id", friendIds);
 
       if (friendProfilesError) {
@@ -176,6 +179,7 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
             id: profile.id,
             username: profile.username?.trim() ?? "",
             name: fullName || profile.username?.trim() || "Unknown user",
+            avatarUrl: getAvatarPublicUrl(profile.avatar_path?.trim() || null),
           };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
@@ -201,8 +205,14 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
         return prev;
       }
 
-      return [...prev, { id: friend.id, username: friend.username }];
+      return [...prev, { id: friend.id, username: friend.username, name: friend.name, avatarUrl: friend.avatarUrl }];
     });
+  }
+
+  function removeInvitee(person: EventInvitee) {
+    setInvitedPeople((prev) => prev.filter((invitee) => invitee.id !== person.id));
+    setInviteSuccess(null);
+    setInviteError(`@${person.username} removed from invite list.`);
   }
 
   async function addInvitee() {
@@ -228,7 +238,7 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
 
     const { data: friendProfile, error: friendLookupError } = await supabase
       .from("profiles")
-      .select("id, username")
+      .select("id, username, first_name, last_name, avatar_path")
       .ilike("username", trimmed)
       .limit(1)
       .maybeSingle();
@@ -252,11 +262,16 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
     }
 
     const username = friendProfile.username.trim();
+    const firstName = friendProfile.first_name?.trim() ?? "";
+    const lastName = friendProfile.last_name?.trim() ?? "";
+    const fullName = `${firstName} ${lastName}`.trim();
+    const inviteeName = fullName || username;
+    const avatarUrl = getAvatarPublicUrl(friendProfile.avatar_path?.trim() || null);
     setInvitedPeople((prev) => {
       if (prev.some((person) => person.id === friendProfile.id)) {
         return prev;
       }
-      return [...prev, { id: friendProfile.id, username }];
+      return [...prev, { id: friendProfile.id, username, name: inviteeName, avatarUrl }];
     });
     setInviteInput("");
     setInviteSuccess(`@${username} added to invite list.`);
@@ -398,11 +413,6 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
       >
         <StepIndicator step={3} total={attendanceCountingEnabled ? 4 : 3} label="Finalize" />
 
-        <View style={commonStyles.heroCard}>
-          <Text style={commonStyles.heroTitle}>Review everything before you create it</Text>
-          <Text style={commonStyles.heroSubtitle}>Set visibility, invitations, and preferences, then publish when it looks right.</Text>
-        </View>
-
         <View style={commonStyles.card}>
           <Text style={commonStyles.cardTitle}>Event summary</Text>
           <Text style={styles.cardText}>Title: {eventName}</Text>
@@ -482,9 +492,14 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
             <View style={styles.chipsWrap}>
               {invitedPeople.map((person) => (
                 <View key={person.id} style={styles.personChip}>
+                  <ProfileAvatar
+                    avatarUrl={person.avatarUrl ?? null}
+                    initials={getProfileInitials(person.name ?? person.username, person.username)}
+                    size={24}
+                  />
                   <Text style={styles.personChipText}>@{person.username}</Text>
                   <Pressable
-                    onPress={() => setInvitedPeople((prev) => prev.filter((invitee) => invitee.id !== person.id))}
+                    onPress={() => removeInvitee(person)}
                     style={styles.removeChipButton}
                   >
                     <Text style={styles.removeChipButtonText}>x</Text>
@@ -514,9 +529,11 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
                     onPress={() => addSuggestedFriend(friend)}
                     style={({ pressed }) => [styles.suggestionRow, pressed && styles.suggestionRowPressed]}
                   >
-                    <View style={styles.suggestionAvatar}>
-                      <Text style={styles.suggestionAvatarText}>{friend.name.charAt(0).toUpperCase()}</Text>
-                    </View>
+                    <ProfileAvatar
+                      avatarUrl={friend.avatarUrl}
+                      initials={getProfileInitials(friend.name, friend.username)}
+                      size={34}
+                    />
                     <View style={styles.suggestionTextWrap}>
                       <Text style={styles.suggestionName}>{friend.name}</Text>
                       <Text style={styles.suggestionUsername}>@{friend.username}</Text>
@@ -541,7 +558,7 @@ export default function CreateEventInviteScreen({ route, navigation }: Props) {
             {creatingEvent
               ? "Creating..."
               : attendanceCountingEnabled
-                ? "Configure behavior"
+                ? "Configure GPS features"
                 : visibility === "Public"
                   ? "Publish event"
                   : "Create event"}
@@ -657,22 +674,9 @@ const styles = StyleSheet.create({
   suggestionRowPressed: {
     opacity: 0.86,
   },
-  suggestionAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "#efe3d3",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 10,
-  },
-  suggestionAvatarText: {
-    color: "#4f4339",
-    fontSize: 13,
-    fontWeight: "700",
-  },
   suggestionTextWrap: {
     flex: 1,
+    marginLeft: 10,
   },
   suggestionName: {
     color: "#201c19",
@@ -704,13 +708,13 @@ const styles = StyleSheet.create({
   },
   personChipText: { color: "#4f4339", fontSize: 12, fontWeight: "600" },
   removeChipButton: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: "#e7d6c4",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#e2c8ad",
     alignItems: "center",
     justifyContent: "center",
   },
-  removeChipButtonText: { color: "#4f4339", fontSize: 11, fontWeight: "700" },
+  removeChipButtonText: { color: "#4f4339", fontSize: 16, fontWeight: "900", lineHeight: 18 },
   primaryBtnDisabled: { opacity: 0.7 },
 });

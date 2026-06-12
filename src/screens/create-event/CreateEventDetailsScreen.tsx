@@ -93,11 +93,6 @@ export default function CreateEventDetailsScreen({ navigation }: Props) {
         keyboardDismissMode="interactive"
       >
         <StepIndicator step={1} total={3} label="Create event" />
-        <View style={commonStyles.heroCard}>
-          <Text style={commonStyles.heroTitle}>Set the basics for your event</Text>
-          <Text style={commonStyles.heroSubtitle}>Choose the name, description, date, and timing before you move on to location.</Text>
-        </View>
-
         <View style={commonStyles.card}>
           <Text style={commonStyles.cardTitle}>Details</Text>
           <Text style={commonStyles.label}>Event name</Text>
