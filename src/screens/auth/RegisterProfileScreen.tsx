@@ -2,7 +2,7 @@ import { useState } from "react";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { getSupabaseDebugInfo, supabase, testSupabaseConnection } from "../../supabase";
+import { supabase } from "../../supabase";
 import { colors, commonStyles } from "../../styles/common";
 
 type AuthStackParamList = {
@@ -16,7 +16,7 @@ type AuthStackParamList = {
 
 type Props = NativeStackScreenProps<AuthStackParamList, "RegisterProfile">;
 
-export default function RegisterProfileScreen({ navigation, route }: Props) {
+export default function RegisterProfileScreen({ route }: Props) {
   const { email, password } = route.params;
   const [username, setUsername] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -27,10 +27,8 @@ export default function RegisterProfileScreen({ navigation, route }: Props) {
     return now;
   });
   const [loading, setLoading] = useState(false);
-  const [testingConnection, setTestingConnection] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [connectionMessage, setConnectionMessage] = useState<string | null>(null);
 
   const formattedDobValue = `${dateOfBirth.getFullYear()}-${String(dateOfBirth.getMonth() + 1).padStart(2, "0")}-${String(dateOfBirth.getDate()).padStart(2, "0")}`;
 
@@ -74,12 +72,8 @@ export default function RegisterProfileScreen({ navigation, route }: Props) {
     setLoading(true);
     setErrorMessage(null);
     setMessage(null);
-    setConnectionMessage(null);
 
     try {
-      const debugInfo = getSupabaseDebugInfo();
-      console.log("[Register] Supabase debug info:", debugInfo);
-
       const { data: existingUsername, error: existingUsernameError } = await supabase
         .from("profiles")
         .select("id")
@@ -126,25 +120,6 @@ export default function RegisterProfileScreen({ navigation, route }: Props) {
     }
 
     setLoading(false);
-  }
-
-  async function handleConnectionTest() {
-    setTestingConnection(true);
-    setConnectionMessage(null);
-
-    const debugInfo = getSupabaseDebugInfo();
-    console.log("[Register] Supabase debug info:", debugInfo);
-
-    const result = await testSupabaseConnection();
-    console.log("[Register] Supabase connection test result:", result);
-
-    setConnectionMessage(
-      result.ok
-        ? `Connection OK (HTTP ${result.status})`
-        : `Connection failed (${result.status || "network error"})`
-    );
-
-    setTestingConnection(false);
   }
 
   return (
@@ -205,20 +180,9 @@ export default function RegisterProfileScreen({ navigation, route }: Props) {
 
         {errorMessage ? <Text style={commonStyles.errorText}>{errorMessage}</Text> : null}
         {message ? <Text style={commonStyles.successText}>{message}</Text> : null}
-        {connectionMessage ? <Text style={styles.info}>{connectionMessage}</Text> : null}
 
         <Pressable style={({ pressed }) => [commonStyles.primaryButton, styles.buttonTop, pressed && commonStyles.pressed]} onPress={handleRegister} disabled={loading}>
           <Text style={commonStyles.primaryButtonText}>{loading ? "Creating..." : "Register"}</Text>
-        </Pressable>
-
-        <Pressable
-          onPress={handleConnectionTest}
-          disabled={testingConnection}
-          style={({ pressed }) => [commonStyles.secondaryButton, pressed && commonStyles.pressed]}
-        >
-          <Text style={commonStyles.secondaryButtonText}>
-            {testingConnection ? "Testing connection..." : "Test Supabase connection"}
-          </Text>
         </Pressable>
       </View>
     </ScrollView>
@@ -247,15 +211,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 10,
     marginTop: 2,
-  },
-  info: {
-    color: "#2f5d50",
-    marginTop: 10,
-    fontSize: 14,
-    backgroundColor: "#eef3e8",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
   },
   buttonTop: {
     marginTop: 18,
