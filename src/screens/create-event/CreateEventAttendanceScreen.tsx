@@ -20,7 +20,7 @@ const presenceOptions: Array<{
   {
     method: null,
     title: "No presence detection",
-    eyebrow: "Optional",
+    eyebrow: "",
     description: "Create the event without automatic attendance tracking.",
   },
   {
@@ -316,7 +316,7 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
         <StepIndicator step={4} total={4} label="GPS features" />
 
         <View style={commonStyles.card}>
-          <Text style={commonStyles.cardTitle}>Presence detection</Text>
+          <Text style={commonStyles.cardTitle}>Automatic attendance method</Text>
           <View style={styles.optionList}>
             {presenceOptions.map((option) => {
               const isSelected = option.method === selectedMethod;
@@ -336,7 +336,9 @@ export default function CreateEventAttendanceScreen({ route, navigation }: Props
                     </View>
                     <View style={styles.methodTextWrap}>
                       <Text style={[styles.methodTitle, isSelected && styles.methodTitleActive]}>{option.title}</Text>
-                      <Text style={[styles.methodEyebrow, isSelected && styles.methodEyebrowActive]}>{option.eyebrow}</Text>
+                      {option.eyebrow ? (
+                        <Text style={[styles.methodEyebrow, isSelected && styles.methodEyebrowActive]}>{option.eyebrow}</Text>
+                      ) : null}
                     </View>
                   </View>
                   <Text style={[styles.methodDescription, isSelected && styles.methodDescriptionActive]}>

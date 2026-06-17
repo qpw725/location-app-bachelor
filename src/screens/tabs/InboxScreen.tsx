@@ -14,8 +14,6 @@ type EventInviteItem = {
   when: string;
   where: string;
   from: string;
-  fromUsername: string;
-  fromAvatarUrl: string | null;
   status: InboxItemStatus;
 };
 
@@ -319,8 +317,6 @@ export default function InboxScreen() {
             when: formatEventTime(event.start_time, event.end_time),
             where: event.location?.trim() || "Location not set",
             from: hostProfile ? fullNameFromProfile(hostProfile) : "Unknown host",
-            fromUsername: hostProfile?.username?.trim() ?? "",
-            fromAvatarUrl: getAvatarPublicUrl(hostProfile?.avatar_path?.trim() || null),
             status: invite.status,
           };
         })
@@ -708,17 +704,7 @@ export default function InboxScreen() {
               <Text style={styles.inviteTitle}>{invite.title}</Text>
               <Text style={styles.inviteMeta}>{invite.when}</Text>
               <Text style={styles.inviteMeta}>{invite.where}</Text>
-              <View style={styles.inviteHostRow}>
-                <ProfileAvatar
-                  avatarUrl={invite.fromAvatarUrl}
-                  initials={getProfileInitials(invite.from, invite.fromUsername)}
-                  size={34}
-                />
-                <View style={styles.inviteHostTextWrap}>
-                  <Text style={styles.inviteHost}>{invite.from}</Text>
-                  {invite.fromUsername ? <Text style={styles.inviteHostUsername}>@{invite.fromUsername}</Text> : null}
-                </View>
-              </View>
+              <Text style={styles.inviteHost}>{invite.from}</Text>
               <View style={styles.actionRow}>
                 <Pressable
                   onPress={() => void updateEventInviteStatus(invite.eventId, "accepted")}
@@ -910,18 +896,7 @@ const styles = StyleSheet.create({
   },
   inviteTitle: { fontSize: 17, fontWeight: "700", color: "#241f1c", marginBottom: 4 },
   inviteMeta: { fontSize: 13, color: "#6f6258", marginBottom: 1 },
-  inviteHostRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-    marginBottom: 12,
-  },
-  inviteHostTextWrap: {
-    flex: 1,
-    marginLeft: 10,
-  },
-  inviteHost: { fontSize: 13, color: "#4e6258", fontWeight: "700" },
-  inviteHostUsername: { fontSize: 12, color: "#6f6258", marginTop: 2 },
+  inviteHost: { fontSize: 13, color: "#4e6258", marginTop: 6, marginBottom: 10, fontWeight: "700" },
   actionRow: { flexDirection: "row", gap: 8 },
   primaryAction: {
     flex: 1,
