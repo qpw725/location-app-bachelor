@@ -28,6 +28,7 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
   const [runtimeLoading, setRuntimeLoading] = useState(false);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
 
+  // Load all event buckets, then pick the bucket this screen was opened from.
   const loadEvent = useCallback(async () => {
     setError(null);
     const { data, error: fetchError } = await fetchEventBuckets();
@@ -38,12 +39,16 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
       return;
     }
 
-    const sourceEvents =
-      source === "attending"
-        ? data.attendingEvents
-        : source === "hosting"
-          ? data.hostingEvents
-          : data.pastEvents;
+    let sourceEvents;
+    if (source === "attending") {
+      sourceEvents = data.attendingEvents;
+    } else if (source === "hosting") {
+      sourceEvents = data.hostingEvents;
+    } else {
+      sourceEvents = data.pastEvents;
+    }
+
+    // Route params only give us the id, so find the full event object in that bucket.
     const matchingEvent = sourceEvents.find((item) => item.id === eventId) ?? null;
 
     setEvent(matchingEvent);
@@ -55,6 +60,7 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
     void loadEvent();
   }, [loadEvent]);
 
+  // Runtime status is separate from the event details because it depends on live attendance/location data.
   const loadRuntimeStatus = useCallback(async () => {
     if (!event?.attendanceEnabled) {
       setRuntimeStatus(null);
@@ -82,6 +88,7 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
     void loadRuntimeStatus();
   }, [event, loadRuntimeStatus]);
 
+  // Keep the status card and attendance overview updated while this screen is open.
   useEffect(() => {
     if (!event?.attendanceEnabled) {
       return;
@@ -139,6 +146,7 @@ export default function EventDetailsScreen({ navigation, route }: Props) {
       void loadRuntimeStatus();
     }, 15000);
 
+    // Clean up Supabase subscriptions and polling when the event changes or the screen unmounts.
     return () => {
       clearInterval(refreshHandle);
       void supabase.removeChannel(attendanceChannel);
@@ -412,6 +420,8 @@ function AttendanceOverview({
   const notArrivedCount = status.participants.filter(
     (participant) => participant.presenceState === "not_arrived" || participant.presenceState === "inactive"
   ).length;
+
+  // Each metric doubles as a filter button and as the source list for the rows below it.
   const metrics = useMemo(
     () => [
       {
@@ -539,6 +549,7 @@ function getAttendanceEmptyText(filter: AttendanceFilter) {
 }
 
 function getAttendanceStatusModel(participant: EventPresencePerson) {
+  // Convert the raw presence state into the label/tone used by attendance rows.
   if (participant.presenceState === "present") {
     return { label: "Present", tone: "success" as const };
   }
@@ -562,6 +573,7 @@ function getAttendanceTimingLines(
 ) {
   const lines: string[] = [];
 
+  // Show timing details that are useful for the currently selected attendance filter.
   if (filter === "present") {
     lines.push(participant.checkedInAt ? `Arrived at ${formatShortTime(new Date(participant.checkedInAt))}` : "Arrival time not recorded");
     return lines;
@@ -672,6 +684,7 @@ function getPresenceMethodLabel(event: EventItem) {
 }
 
 function getStatusCardStyle(severity: EventRuntimeSeverity | undefined) {
+  // Severity is a UI tone for the current runtime status, not the status logic itself.
   if (severity === "danger") {
     return styles.eventStatusDanger;
   }
