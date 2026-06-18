@@ -116,12 +116,10 @@ export async function pickAndUploadAvatar(options: {
   avatarUrl: string | null;
   error: string | null;
   cancelled: boolean;
+  permissionBlocked?: boolean;
 }> {
   try {
-    const permissionResult =
-      options.source === "camera"
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const permissionResult = await requestAvatarPermission(options.source);
 
     if (!permissionResult.granted) {
       return {
@@ -129,6 +127,7 @@ export async function pickAndUploadAvatar(options: {
         avatarUrl: getAvatarPublicUrl(options.currentAvatarPath),
         error: options.source === "camera" ? "Camera permission is required." : "Photo library permission is required.",
         cancelled: false,
+        permissionBlocked: !permissionResult.canAskAgain,
       };
     }
 
@@ -283,6 +282,21 @@ export async function removeAvatar(options: {
       error: error instanceof Error ? error.message : "Could not remove your profile photo.",
     };
   }
+}
+
+async function requestAvatarPermission(source: "camera" | "library") {
+  const currentPermission =
+    source === "camera"
+      ? await ImagePicker.getCameraPermissionsAsync()
+      : await ImagePicker.getMediaLibraryPermissionsAsync();
+
+  if (currentPermission.granted || !currentPermission.canAskAgain) {
+    return currentPermission;
+  }
+
+  return source === "camera"
+    ? ImagePicker.requestCameraPermissionsAsync()
+    : ImagePicker.requestMediaLibraryPermissionsAsync();
 }
 
 function getImageExtension(uri: string, mimeType?: string | null) {

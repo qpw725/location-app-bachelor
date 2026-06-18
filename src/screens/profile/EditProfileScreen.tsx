@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import type { RootStackParamList } from "../../../App";
 import ProfileAvatar from "../../components/ProfileAvatar";
 import { fetchCurrentProfile, getProfileInitials, pickAndUploadAvatar, removeAvatar } from "../../profile";
@@ -149,6 +149,7 @@ export default function EditProfileScreen({ navigation, route }: Props) {
 
     if (result.error) {
       setErrorMessage(result.error);
+      showAvatarError(result.error, result.permissionBlocked);
       return;
     }
 
@@ -179,6 +180,7 @@ export default function EditProfileScreen({ navigation, route }: Props) {
 
     if (result.error) {
       setErrorMessage(result.error);
+      showAvatarError(result.error);
       return;
     }
 
@@ -294,11 +296,19 @@ export default function EditProfileScreen({ navigation, route }: Props) {
       newPassword: "",
       confirmPassword: "",
     }));
-    setSuccessMessage(
-      payload.email || payload.password
-        ? "Profile updated. If Supabase requires confirmation for email or password changes, follow the message sent to your email."
-        : "Profile updated."
-    );
+    setSuccessMessage("Profile updated.");
+  }
+
+  function showAvatarError(message: string, permissionBlocked?: boolean) {
+    if (!permissionBlocked) {
+      Alert.alert("Profile photo", message);
+      return;
+    }
+
+    Alert.alert("Profile photo permission", `${message} You can enable it in your device settings.`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Open Settings", onPress: () => void Linking.openSettings() },
+    ]);
   }
 
   if (isLoading) {

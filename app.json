@@ -37,6 +37,13 @@
           "locationAlwaysAndWhenInUsePermission": "Allow this app to access your location in the background so live event sharing stays active until you stop it or the event ends.",
           "isIosBackgroundLocationEnabled": true
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow this app to choose a photo for your profile picture.",
+          "cameraPermission": "Allow this app to take a photo for your profile picture."
+        }
       ]
     ],
     "extra": {

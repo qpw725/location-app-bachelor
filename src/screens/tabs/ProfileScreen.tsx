@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Alert, View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import { Alert, Linking, View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { CompositeScreenProps, useFocusEffect } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -90,6 +90,7 @@ export default function ProfileScreen({ navigation }: Props) {
 
     if (result.error) {
       setAvatarMessage(result.error);
+      showAvatarError(result.error, result.permissionBlocked);
       return;
     }
 
@@ -119,6 +120,7 @@ export default function ProfileScreen({ navigation }: Props) {
 
     if (result.error) {
       setAvatarMessage(result.error);
+      showAvatarError(result.error);
       return;
     }
 
@@ -127,6 +129,18 @@ export default function ProfileScreen({ navigation }: Props) {
       avatarPath: null,
       avatarUrl: null,
     }));
+  }
+
+  function showAvatarError(message: string, permissionBlocked?: boolean) {
+    if (!permissionBlocked) {
+      Alert.alert("Profile photo", message);
+      return;
+    }
+
+    Alert.alert("Profile photo permission", `${message} You can enable it in your device settings.`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Open Settings", onPress: () => void Linking.openSettings() },
+    ]);
   }
 
   return (
